@@ -4,7 +4,7 @@ from src.model import *
 from src.evaluation import *
 from src.clustering import *
 from src.vectorization import *
-
+from src.visualizations import *
 
 data, _ = get_data()
 
@@ -20,6 +20,8 @@ if __name__ == "__main__":
 
     clusters = word_clusters(data_processed, words, word_similarities, clustering_type="kmeans",
                              params={'n_clusters': 10, 'random_state': 42, })
+
+    create_circle_tree(clusters)
 
     print(coherence_score(data_processed, clusters))
 

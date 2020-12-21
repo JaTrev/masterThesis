@@ -25,7 +25,7 @@ def spectral_clustering(word_embeddings: list, word_weights :list = None, params
 
 
 def word_clusters(processed_docs: list, words: list, word_embeddings: list,
-                  clustering_type: str, params: dict, word_weights: list = None) -> list:
+                  clustering_type: str, params: dict, word_weights: list = None, n_words: int = 10) -> list:
     """
     word_clusters returns a sorted list of words for each cluster
 
@@ -57,7 +57,7 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list,
 
     # sort cluster_words
     word_counter = tf_word_counter(processed_docs)
-    sorted_cluster_words = [sorted(list(c), key=(lambda w: word_counter[w]), reverse=True)
+    sorted_cluster_words = [sorted(list(c), key=(lambda w: word_counter[w]), reverse=True)[:n_words]
                             for c in cluster_words]
 
     return sorted_cluster_words
