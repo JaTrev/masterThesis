@@ -26,6 +26,17 @@ def spectral_clustering(word_embeddings: list, word_weights :list = None, params
 
 def word_clusters(processed_docs: list, words: list, word_embeddings: list,
                   clustering_type: str, params: dict, word_weights: list = None) -> list:
+    """
+    word_clusters returns a sorted list of words for each cluster
+
+    :param processed_docs: list of preprocessed documents
+    :param words: list of words
+    :param word_embeddings: list of word embeddings
+    :param clustering_type: defines the clustering method ('kmeans', 'agglomerative', 'spectral')
+    :param params: clustering parameters
+    :param word_weights: word weighting used for clustering
+    :return:
+    """
 
     assert len(word_embeddings) == len(words), "word_embeddings and word list do not have the same length"
 

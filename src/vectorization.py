@@ -38,11 +38,12 @@ def create_w2v_model(processed_data: list, min_c: int, win: int, negative: int, 
     return w2v_model
 
 
-def get_word_vectors(processed_data: list, saved_model=None,  params=None) -> (list, list, Word2Vec):
+def get_word_vectors(processed_data: list, vocab: list, saved_model=None, params=None) -> (list, list, Word2Vec):
     """
     get_word_vectors calculates the vector representations of words
 
     :param processed_data: list of processed documents
+    :param processed_data: list of words in the processed documents
     :param saved_model: name of a previously saved w2v_model
     :param params: parameters for a w2v_model
 
@@ -61,10 +62,14 @@ def get_word_vectors(processed_data: list, saved_model=None,  params=None) -> (l
 
         w2v_model = create_w2v_model(processed_data, **params)
 
-    return w2v_model.wv.index2word, w2v_model.wv.vectors, w2v_model
+    vocab_words = [w for w in w2v_model.wv.index2word if w in vocab]
+    vocab_embeddings = [w2v_model.wv.vectors[i_w] for i_w, w in enumerate(w2v_model.wv.index2word)
+                        if w in vocab]
+
+    return vocab_words, vocab_embeddings, w2v_model
 
 
-def get_word_similarities(word_embeddings: list) -> list[list]:
+def get_word_similarities(word_embeddings: list) -> list:
     similarities = cosine_similarity(word_embeddings)
 
     assert len(similarities) == len(word_embeddings)
@@ -80,3 +85,8 @@ def get_tf_idf(processed_data: list):
     tfidf_matrix = tfidf_vectorizer.fit_transform(data_strings)
 
     return tfidf_matrix
+
+
+if __name__ == "__main__":
+    #w2v_model = Word2Vec.load("w2v_node2vec")
+    word, word_embeddings, w2v_model = get_word_vectors([], "data/w2v_node2vec")

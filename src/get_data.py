@@ -1,11 +1,11 @@
-# fetch data
-
 import glob
 import os
 import pandas as pd
 import collections
 from tqdm import tqdm
 import numpy as np
+import pickle
+from pathlib import Path
 
 
 def get_partition(task_data_path, path="data/processed_tasks/metadata/partition.csv") \
@@ -120,11 +120,36 @@ def prepare_data(task_data_path, transcription_path) -> dict:
 
 
 def get_data(task_data_path='data/processed_tasks/c2_muse_topic',
-             transcription_path='data/processed_tasks/c2_muse_topic/transcription_segments'):
+             transcription_path='data/processed_tasks/c2_muse_topic/transcription_segments') -> (list, list):
+    """
+    get_data collects the data and test_data
 
-    all_data = prepare_data(task_data_path=task_data_path, transcription_path=transcription_path)
-    data = all_data['train']['text']
-    data.extend(all_data['devel']['text'])
-    test_data = all_data['test']['text']
+    :param task_data_path:  path to data task
+    :param transcription_path: path to transcription
+
+    :return: training data, testing data
+    """
+
+    if Path("data/savedData.pickle").is_file():
+        print("Fetching data via pickle!")
+
+        with open("data/savedData.pickle", "rb") as myFile:
+            data = pickle.load(myFile)
+        with open("data/savedTest_Data.pickle", "rb") as myFile:
+            test_data = pickle.load(myFile)
+
+    else:
+
+        all_data = prepare_data(task_data_path=task_data_path, transcription_path=transcription_path)
+
+        data = all_data['train']['text']
+        data.extend(all_data['devel']['text'])
+        test_data = all_data['test']['text']
+
+        with open("data/savedData.pickle", "wb") as myFile:
+            pickle.dump(data, myFile)
+
+        with open("data/savedTest_Data.pickle", "wb") as myFile:
+            pickle.dump(test_data, myFile)
 
     return data, test_data
