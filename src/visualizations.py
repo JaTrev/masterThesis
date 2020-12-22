@@ -32,6 +32,12 @@ def hyper_fit(coords, IterMax=99, verbose=False):
         - yc : y-coordinate of solution center (float)
         - R : Radius of solution (float)
         - residu : s, sigma - variance of data wrt solution (float)
+
+    Code from:
+    Circle-Fit
+    https://github.com/AlliedToasters/circle-fit
+    by Michael Klear / AlliedToasters and Marian KLeineberg
+    December, 2020
     """
     X, X = None, None
     if isinstance(coords, np.ndarray):
@@ -144,9 +150,11 @@ def create_circle_tree(topics: list):
                 node_colors.append(mapper.to_rgba(i_t + 1))
                 found_topic = True
                 break
-        if not(found_topic):
-            print(n[-1])
-            topic_num = str(n)[-1]
+
+        if not found_topic:
+            topic_num = int(''.join(x for x in n if x.isdigit()))
+            print("topic_num: " + str(topic_num))
+
             node_colors.append(mapper.to_rgba(int(topic_num)))
 
     assert len(node_colors) == len(G.nodes)

@@ -88,5 +88,5 @@ def get_tf_idf(processed_data: list):
 
 
 if __name__ == "__main__":
-    #w2v_model = Word2Vec.load("w2v_node2vec")
+    # w2v_model = Word2Vec.load("w2v_node2vec")
     word, word_embeddings, w2v_model = get_word_vectors([], "data/w2v_node2vec")
