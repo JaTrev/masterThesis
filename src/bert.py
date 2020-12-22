@@ -293,6 +293,7 @@ def train_bert(model: BertForMaskedLM, train_data_loader: DataLoader, validation
 
 
 def calculate_bert_embeddings(model: BertForMaskedLM, prediction_dataloader: DataLoader, bert_layer: list = -1):
+    print("Fetching bert embeddings from layer: " + str(bert_layer))
     embeddings = []
 
     # Put model in evaluation mode
@@ -323,12 +324,10 @@ def calculate_bert_vocab_embeddings(embeddings: list, vocab: list,
                                     vocab_weights_cutoff: int = 60):
 
     assert vocab_weights_cutoff > 1, "vocab_weights_cutoff must be larger than 1"
-
     assert len(embeddings) == len(input_ids), "embeddings and input_ids are not the same size"
 
     sentence_embeddings = []
     sentence_weights = []
-
     vocab_embeddings = [[] for _ in vocab]
     vocab_weights = [0 for _ in vocab]
 
