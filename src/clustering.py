@@ -25,7 +25,7 @@ def spectral_clustering(word_embeddings: list, word_weights :list = None, params
 
 
 def word_clusters(processed_docs: list, words: list, word_embeddings: list,
-                  clustering_type: str, params: dict, word_weights: list = None, n_words: int = 10) -> list:
+                  clustering_type: str, params: dict, word_weights: list = None, n_words : int = 10) -> (list, list):
     """
     word_clusters returns a sorted list of words for each cluster
 
@@ -35,6 +35,7 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list,
     :param clustering_type: defines the clustering method ('kmeans', 'agglomerative', 'spectral')
     :param params: clustering parameters
     :param word_weights: word weighting used for clustering
+    :param n_words: number of words for every cluster
     :return:
     """
 
@@ -47,21 +48,25 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list,
     }
     assert clustering_type in ['kmeans', 'agglomerative', 'spectral'], "incorrect clustering_type"
 
-    # cluster words
+    # cluster words to cluster labels
     labels = clustering_dict[clustering_type](word_embeddings, word_weights, params)
 
     # assign each word to cluster list
     cluster_words = [[] for _ in range(len(set(labels)))]
+    cluster_embeddings = [[] for _ in range(len(cluster_words))]
     for l_id, l in enumerate(list(labels)):
         cluster_words[l].append(words[l_id])
+        cluster_embeddings[l].append(word_embeddings[l_id])
 
     # sort cluster_words
     word_counter = tf_word_counter(processed_docs)
-    sorted_cluster_words = [sorted(list(c), key=(lambda w: word_counter[w]), reverse=True)[:n_words]
-                            for c in cluster_words]
+    sorted_cluster_words = []
+    sorted_cluster_embeddings = []
+    sorted_cluster_idxs = [sorted(range(len(c)), key=lambda k: word_counter[c[k]], reverse=True)[:n_words] for c
+                           in cluster_words]
 
-    return sorted_cluster_words
+    for i_c in range(len(cluster_words)):
+        sorted_cluster_words.append([cluster_words[i_c][i] for i in sorted_cluster_idxs[i_c]])
+        sorted_cluster_embeddings.append([cluster_embeddings[i_c][i] for i in sorted_cluster_idxs[i_c]])
 
-
-
-
+    return sorted_cluster_words, sorted_cluster_embeddings

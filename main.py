@@ -14,25 +14,22 @@ data, _ = get_data()
 
 if __name__ == "__main__":
     vocab = preprocessing(data, True)
-    tokenizer = init_tokenizer()
-    main(tokenizer, data, vocab)
 
-
-    #data_processed = preprocessing(data)
-
-    """
-    vocab = preprocessing(data, True)
+    data_processed = preprocessing(data)
 
     words, word_embeddings, w2v_model = get_word_vectors([], vocab, "data/w2v_node2vec")
 
-    word_similarities = get_word_similarities(word_embeddings)
+    # word_similarities = get_word_similarities(word_embeddings)
 
-    clusters = word_clusters(data_processed, words, word_similarities, clustering_type="kmeans",
-                             params={'n_clusters': 10, 'random_state': 42, })
+    clusters_words, clusters_embeddings = word_clusters(data_processed, words,
+                                                        word_embeddings, clustering_type="kmeans",
+                                                        params={'n_clusters': 10, 'random_state': 42, })
 
-    create_circle_tree(clusters)
+    tsne_plot(clusters_words, clusters_embeddings)
 
-    print(coherence_score(data_processed, clusters))
-    """
+    create_circle_tree(clusters_words)
+
+    print(coherence_score(data_processed, clusters_words))
+
 
 

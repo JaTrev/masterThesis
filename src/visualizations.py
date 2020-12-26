@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from math import sqrt, pi
+from sklearn.manifold import TSNE
+
+plt.figure(figsize=(10, 8))
 
 
 def sigma(coords, x, y, r):
@@ -55,7 +58,7 @@ def hyper_fit(coords, IterMax=99, verbose=False):
     Yi = Y - Y.mean()
     Zi = Xi*Xi + Yi*Yi
 
-    #compute moments
+    # compute moments
     Mxy = (Xi*Yi).sum()/n
     Mxx = (Xi*Xi).sum()/n
     Myy = (Yi*Yi).sum()/n
@@ -63,7 +66,7 @@ def hyper_fit(coords, IterMax=99, verbose=False):
     Myz = (Yi*Zi).sum()/n
     Mzz = (Zi*Zi).sum()/n
 
-    #computing the coefficients of characteristic polynomial
+    # computing the coefficients of characteristic polynomial
     Mz = Mxx + Myy
     Cov_xy = Mxx*Myy - Mxy*Mxy
     Var_z = Mzz - Mz*Mz
@@ -131,8 +134,6 @@ def create_circle_tree(topics: list):
 
         pos[topic_label] = [t_x, t_y]
 
-    plt.figure(figsize=(10, 8))
-
     norm = mpl.colors.Normalize(vmin=0, vmax=len(topics) + 2, clip=True)
     mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
 
@@ -153,7 +154,7 @@ def create_circle_tree(topics: list):
 
         if not found_topic:
             topic_num = int(''.join(x for x in n if x.isdigit()))
-            print("topic_num: " + str(topic_num))
+            # print("topic_num: " + str(topic_num))
 
             node_colors.append(mapper.to_rgba(int(topic_num)))
 
@@ -165,6 +166,54 @@ def create_circle_tree(topics: list):
     plt.show()
 
 
+def tsne_plot(clusters: list, cluster_embeddings: list,
+              perplexity: int = 40, n_iter: int = 500, random_state: int = 42):
+    """
+    Create a TSNE 2-D plot.
+    :param clusters: list of words for each cluster
+    :param cluster_embeddings: list of embeddings for each cluster
+    :param perplexity: perplexity for TSNE
+    :param n_iter: number of iteration for TSNE
+    :param random_state: random state for TSNE
+    :return: scatter plot of TSNE
+    """
+
+    words = []
+    word_embeddings = []
+    for i_c in range(len(clusters)):
+        words.extend(clusters[i_c])
+        word_embeddings.extend(cluster_embeddings[i_c])
+
+    assert len(words) == len(word_embeddings), "make sure the number of words and the number of word embeddings " \
+                                               "is the same"
+
+    tsne_model = TSNE(perplexity=perplexity, n_components=2, init='pca', n_iter=n_iter, random_state=random_state)
+    new_values = tsne_model.fit_transform(word_embeddings)
+
+    x_coord, y_coord = [], []
+    for value in new_values:
+        x_coord.append(value[0])
+        y_coord.append(value[1])
+
+    norm = mpl.colors.Normalize(vmin=0, vmax=len(clusters) + 1, clip=True)
+    mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
+
+    node_colors = []
+    for i_c, c in enumerate(clusters):
+        node_colors.extend([mapper.to_rgba(i_c) for _ in c])
+
+    for i in range(len(node_colors)):
+        plt.scatter(x_coord[i], y_coord[i], c=node_colors[i])
+        plt.annotate(words[i],
+                     xy=(x_coord[i], y_coord[i]),
+                     xytext=(5, 2),
+                     textcoords='offset points',
+                     ha='right',
+                     va='bottom')
+    plt.show()
+    return plt
+
+
 if __name__ == "__main__":
     create_circle_tree([["word", "sadsa", "sdadas"], ["sadsa2", "eada", "1431324", "sasa"],
-                        ["aa", "tt"], ["adsada","y"]])
+                        ["aa", "tt"], ["adsada", "y"]])
