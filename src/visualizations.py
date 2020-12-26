@@ -5,6 +5,7 @@ import numpy as np
 from math import sqrt, pi
 from sklearn.manifold import TSNE
 
+
 plt.figure(figsize=(10, 8))
 
 
@@ -76,7 +77,7 @@ def hyper_fit(coords, IterMax=99, verbose=False):
     A0 = Mxz*(Mxz*Myy - Myz*Mxy) + Myz*(Myz*Mxx - Mxz*Mxy) - Var_z*Cov_xy
     A22 = A2 + A2
 
-    #finding the root of the characteristic polynomial
+    # finding the root of the characteristic polynomial
     y = A0
     x = 0.
     for i in range(IterMax):

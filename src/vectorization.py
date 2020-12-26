@@ -33,6 +33,8 @@ def create_w2v_model(processed_data: list, min_c: int, win: int, negative: int, 
     w2v_model.train(processed_data,
                     total_examples=w2v_model.corpus_count,
                     epochs=epochs, report_delay=1)
+
+    # normalize vectors:
     w2v_model.init_sims(replace=True)
 
     return w2v_model
@@ -89,4 +91,4 @@ def get_tf_idf(processed_data: list):
 
 if __name__ == "__main__":
     # w2v_model = Word2Vec.load("w2v_node2vec")
-    word, word_embeddings, w2v_model = get_word_vectors([], "data/w2v_node2vec")
+    word, word_embeddings, w2v_model_test = get_word_vectors([], "data/w2v_node2vec")
