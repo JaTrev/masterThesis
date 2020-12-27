@@ -10,6 +10,7 @@ from collections import Counter
 from stellargraph.data import UniformRandomWalk
 from stellargraph.data import UnsupervisedSampler
 from stellargraph.mapper import GraphSAGELinkGenerator
+import stellargraph.layer
 from stellargraph.layer import GraphSAGE, link_classification, AttentionalAggregator,\
     MeanPoolingAggregator, MaxPoolingAggregator, MeanAggregator
 from tensorflow import keras
@@ -19,14 +20,38 @@ from math import sqrt
 
 plt.rcParams['figure.figsize'] = [16, 9]
 
-def create_networkx_graph(words: list, word_embeddings: list, similarity_threshold: int = 0.4, percentile:int = 80,
-                          remove_isolated_nodes:bool = True) -> nx.Graph:
+
+def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, remove_isolated_nodes):
+    # remove edges that do not have a high enough similarity score
+    min_cutoff_value = np.percentile(edge_weights, percentile_cutoff)
+
+    edges_to_kill = []
+    for n, nbrs in graph.adj.items():
+
+        for nbr, eattr in nbrs.items():
+
+            # remove edges below a certain weight
+            n_weight = eattr['weight']
+            if n_weight < min_cutoff_value:
+                edges_to_kill.append((n, nbr))
+
+    for u, v in edges_to_kill:
+        if graph.has_edge(u, v):
+            graph.remove_edge(u, v)
+
+    if remove_isolated_nodes:
+        graph.remove_nodes_from(list(nx.isolates(graph)))
+    return graph
+
+
+def create_networkx_graph(words: list, word_embeddings: list, similarity_threshold: int = 0.4,
+                          percentile_cutoff: int = 80, remove_isolated_nodes: bool = True) -> nx.Graph:
     """
     create_networdx_graph creates a graph given the words and their embeddings
     :param words: list of words which will be the nodes
     :param word_embeddings: embeddings of the words
     :param similarity_threshold: cosine similarity threshold value for the edges
-    :param percentile: percentile threshold value
+    :param percentile_cutoff: percentile threshold value
     :param remove_isolated_nodes: boolean indicating if isolated nodes should be removed
     :return: graph
     """
@@ -53,39 +78,17 @@ def create_networkx_graph(words: list, word_embeddings: list, similarity_thresho
                     edge_weights.append(weight)
                     n = n + 1
 
-    percentile_threshold = np.percentile(edge_weights, percentile)
-    edges_to_kill = []
-
-    for n, nbrs in graph.adj.items():
-
-        for nbr, eattr in nbrs.items():
-
-            # remove edges below a certain weight
-            n_weight = eattr['weight']
-
-            if n_weight < percentile_threshold:
-                edges_to_kill.append((n, nbr))
-
-    for u, v in edges_to_kill:
-        if graph.has_edge(u, v):
-            graph.remove_edge(u, v)
-
-    if remove_isolated_nodes:
-        graph.remove_nodes_from(list(nx.isolates(graph)))
-
-    return graph
+    return remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes)
 
 
-def add_node_feature(graph: nx.Graph, feature_list: list, node_feature:str = "feature"):
+def create_graph_with_features(graph: nx.Graph, node_list: list, feature_list: list, node_features: str = "feature"):
 
-    assert len(graph.nodes()) == len(feature_list), "the feature_list must have a feature for each node"
+    assert len(node_list) == len(feature_list), "the feature_list must have a feature for each node"
 
     feature_graph = graph.copy()
-    node_list = list(feature_graph.nodes())
-
     for node_id, node_data in feature_graph.nodes(data=True):
         node_index = node_list.index(node_id)
-        node_data[node_feature] = feature_list[node_index]
+        node_data[node_features] = feature_list[node_index]
 
     return feature_graph
 
@@ -114,8 +117,8 @@ def sort_words_by(graph: nx.Graph, word: str, word_counter: Counter):
     return w_degree, sim_score, w_tf
 
 
-def graph_evaluation(graph: nx.Graph, processed_data: list, k_component: int = 1,
-                     min_topic_number: int = 5) -> (list, plt):
+def graph_evaluation_visualisation(graph: nx.Graph, processed_data: list, k_component: int = 1,
+                                   min_topic_number: int = 5) -> (list, plt):
     temp_list = []
     for l in processed_data:
         temp_list.extend(l)
@@ -170,40 +173,38 @@ def graph_evaluation(graph: nx.Graph, processed_data: list, k_component: int = 1
     return cluster_words, plt
 
 
-def graph_sage_embeddings(stellargraph: sg.StellarGraph, batch_size: int = 50,
-                          number_of_walks: int = 5, length: int = 3, epochs: int = 10, num_samples=(10, 5)) \
-        -> (list, list):
+def graph_sage_embeddings(sg_graph: sg.StellarGraph, aggregator: stellargraph.layer = AttentionalAggregator,
+                          batch_size: int = 50, number_of_walks: int = 5, length: int = 3, epochs: int = 10,
+                          num_samples=(10, 5), optimizer: keras.optimizers = keras.optimizers.Adam(),
+                          dropout: float = 0.0, layer_sizes=(50, 50), seed: int = 42) -> (list, list):
 
-    nodes = list(stellargraph.nodes())
+    nodes = list(sg_graph.nodes())
 
-    generator = GraphSAGELinkGenerator(stellargraph, batch_size, [num_samples[0], num_samples[1]], seed=42)
+    generator = GraphSAGELinkGenerator(sg_graph, batch_size, list(num_samples), seed=seed)
 
-    layer_sizes = [50, 50]
+    graph_sage = GraphSAGE(
+        layer_sizes=list(layer_sizes), generator=generator, bias=True,
+        dropout=dropout, normalize="l2", aggregator=aggregator)  # AttentionalAggregator: 0.72
 
-    graphsage = GraphSAGE(
-        layer_sizes=layer_sizes, generator=generator, bias=True,
-        dropout=0.0, normalize="l2", aggregator=AttentionalAggregator)  # AttentionalAggregator: 0.72
-
-    # Build the model and expose input and output sockets of graphsage, for node pair inputs:
-    x_inp, x_out = graphsage.in_out_tensors()
+    # Build the model and expose input and output sockets of graph_sage, for node pair inputs:
+    x_inp, x_out = graph_sage.in_out_tensors()
 
     # classification layer
-    prediction = link_classification(
-        output_dim=1, output_act="sigmoid", edge_embedding_method="mul")(x_out)
+    prediction = link_classification(output_dim=1, output_act="sigmoid", edge_embedding_method="mul")(x_out)
 
     # stark GraphSAGE encoder and prediction layer
     model_sage = keras.Model(inputs=x_inp, outputs=prediction)
 
     model_sage.compile(
-        optimizer=keras.optimizers.Adam(lr=1e-3),
+        optimizer=optimizer,
         loss=keras.losses.binary_crossentropy,
         metrics=[keras.metrics.binary_accuracy]
     )
 
     # train
-    unsupervised_samples = UnsupervisedSampler(stellargraph, nodes=nodes,
-                                               length=length, number_of_walks=number_of_walks, seed=42)
-    train_gen = generator.flow(unsupervised_samples, seed=42)
+    unsupervised_samples = UnsupervisedSampler(sg_graph, nodes=nodes, length=length,
+                                               number_of_walks=number_of_walks, seed=seed)
+    train_gen = generator.flow(unsupervised_samples, seed=seed)
 
     model_sage.fit(
         train_gen,
@@ -216,10 +217,11 @@ def graph_sage_embeddings(stellargraph: sg.StellarGraph, batch_size: int = 50,
 
     x_inp_src = x_inp[0::2]
     x_out_src = x_out[0]
+
+    # get new node embeddings
     embedding_model = keras.Model(inputs=x_inp_src, outputs=x_out_src)
 
-    # node_ids = strong_G.nodes()
-    node_gen = GraphSAGENodeGenerator(stellargraph, batch_size, num_samples, seed=42).flow(nodes, seed=42)
+    node_gen = GraphSAGENodeGenerator(sg_graph, batch_size, num_samples, seed=seed).flow(nodes, seed=seed)
     node_embeddings = embedding_model.predict(node_gen, workers=1, verbose=1)
 
     corpus_node_embeddings = node_embeddings
@@ -227,3 +229,47 @@ def graph_sage_embeddings(stellargraph: sg.StellarGraph, batch_size: int = 50,
     assert len(corpus_node_embeddings) == len(corpus_node_words)
 
     return corpus_node_words, corpus_node_embeddings
+
+
+def add_doc_to_graph(graph: nx.Graph, original_nodes: list, original_node_embeddings: list,
+                     new_nodes: list, new_node_embeddings: list, new_node_features: list,
+                     percentile_cutoff: int = 99, remove_isolated_nodes: bool = True):
+
+    assert len(new_nodes) == len(new_node_embeddings), "need same amount of words and embeddings (new)"
+    assert len(original_nodes) == len(original_node_embeddings), "need same amount of words and embeddings (original)"
+    assert len(new_nodes) == len(new_node_features)
+
+    new_graph = graph.copy()
+    new_edges_weights = []
+
+    # calculate similarity between new nodes and old ones
+    for i, word_i in enumerate(new_nodes):
+        for j, word_j in enumerate(original_nodes):
+            if word_i != word_j:
+                if not (new_graph.has_edge(word_j, word_i)):
+
+                    sim = cosine_similarity(new_node_embeddings[i].reshape(1, -1),
+                                            original_node_embeddings[j].reshape(1, -1))
+                    if sim < 0:
+                        continue
+                    new_graph.add_edge(word_i, word_j, weight=sim)
+                    new_edges_weights.append(sim)
+
+    # calculate similarity between new nodes
+    for i, word_i in enumerate(new_nodes):
+        for j, word_j in enumerate(new_nodes):
+            if word_i != word_j:
+                if not (new_graph.has_edge(word_j, word_i)):
+
+                    sim = cosine_similarity(new_node_embeddings[i].reshape(1, -1),
+                                            new_node_embeddings[j].reshape(1, -1))
+                    if sim < 0:
+                        continue
+                    new_graph.add_edge(word_i, word_j, weight=sim)
+                    new_edges_weights.append(sim)
+
+    new_graph = remove_edges(new_graph, new_edges_weights, percentile_cutoff, remove_isolated_nodes)
+
+    new_feature_graph = create_graph_with_features(new_graph, new_nodes, new_node_features)
+
+    return new_feature_graph
