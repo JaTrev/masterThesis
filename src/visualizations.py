@@ -2,7 +2,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from math import sqrt, pi
+from math import sqrt
 from sklearn.manifold import TSNE
 
 
@@ -162,9 +162,24 @@ def create_circle_tree(topics: list):
     assert len(node_colors) == len(G.nodes)
 
     nx.draw(G, pos=pos, node_size=100, node_color=node_colors, linewidths=0.01,
-            font_size=10, font_weight='bold', with_labels=True, )
+            font_size=15, with_labels=True, )
 
     plt.show()
+
+
+def scatter_plot(x: list, ys: list) -> plt:
+
+    assert isinstance(ys[0], list), "ys needs to be a list of list(s)"
+
+    norm = mpl.colors.Normalize(vmin=0, vmax=len(ys) + 1, clip=True)
+    mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
+    ys_color = [mapper.to_rgba(i_y) for i_y,_ in enumerate(ys)]
+
+    for i_y, y in enumerate(ys):
+        plt.plot(x, y, 'o', c=ys_color[i_y], markersize=20, linewidth=5)
+
+    # plt.show()
+    return plt
 
 
 def tsne_plot(clusters: list, cluster_embeddings: list,
