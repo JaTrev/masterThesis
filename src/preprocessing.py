@@ -29,7 +29,7 @@ stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'car', 'lik
 stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really"])
 
 
-def preprocessing(docs: list, vocab=False) -> list:
+def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = False, vocab=False) -> list:
     """
     Document for processing a list of documents.
 
@@ -41,6 +41,10 @@ def preprocessing(docs: list, vocab=False) -> list:
       returns list of words (vocubalary)
 
     """
+    print("---------")
+    print("do_stemming: " + str(do_stemming))
+    print("do_lemmatizing: " + str(do_lemmatizing))
+    print("---------")
 
     vocabulary = []
     new_docs = []
@@ -65,10 +69,12 @@ def preprocessing(docs: list, vocab=False) -> list:
                                                                 'NNS',
                                                                 'NNPS']]
         # stemming
-        # tkns = [PorterStemmer().stem(w) for w in tkns]
+        if do_stemming:
+            tkns = [PorterStemmer().stem(w) for w in tkns]
 
         # lemmatizing
-        tkns = [WordNetLemmatizer().lemmatize(w) for w in tkns]
+        if do_lemmatizing:
+            tkns = [WordNetLemmatizer().lemmatize(w) for w in tkns]
 
         if len(tkns) == 0:
             continue

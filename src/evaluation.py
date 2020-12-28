@@ -4,6 +4,7 @@ import sklearn.metrics
 from scipy.spatial import distance
 import numpy as np
 
+
 def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v', top_n_words: int = 10) -> float:
     """
     coherence_score calculates the coherence score based on the cluster_words and top_n_words.
@@ -147,4 +148,3 @@ def compute_aic_bic(data_matrix, labels) -> (float, float):
     """
 
     return aic, bic
-
