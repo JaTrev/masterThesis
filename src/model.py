@@ -14,7 +14,6 @@ def lsa_topics(processed_data: list, n_topics: int = 10, n_words: int = 10):
     for topic_word_dist in lsa_model.get_topics():
 
         topic = [lsa_model.id2word[i] for i in topic_word_dist.argsort()[::-1][:n_words]]
-        print(topic)
         topics.append(topic)
 
     return topics
@@ -34,7 +33,6 @@ def lda_topics(processed_data: list, n_topics: int = 10, learning_decay: float =
     topics = []
     for i_t, topic_word_dist in enumerate(lda_model.get_topics()):
         topic = [lda_model.id2word[w_id] for w_id,_ in lda_model.get_topic_terms(i_t, topn=n_words)]
-        print(topic)
         topics.append(topic)
 
     return topics
@@ -51,7 +49,6 @@ def lda_mallet_topics(processed_data: list, n_topics: int = 10, n_words: int = 1
     topics = []
     for i_t, _ in enumerate(lda_mallet.get_topics()):
         topic = [w for w, _ in lda_mallet.show_topic(i_t, topn=n_words)]
-        print(topic)
         topics.append(topic)
 
     return topics
@@ -86,7 +83,6 @@ def nmf_topics(preprocessed_data: list, n_topics: int = 10, n_features: int = 20
     topics = []
     for topic_idx, topic in enumerate(nmf_model.components_):
         top_features = [feature_names[i] for i in topic.argsort()[:-n_words - 1:-1]]
-        print(top_features)
         topics.append(top_features)
     return topics
 

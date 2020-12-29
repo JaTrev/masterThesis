@@ -1,12 +1,16 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import networkx as nx
 import numpy as np
 from math import sqrt
 from sklearn.manifold import TSNE
 
 
-plt.figure(figsize=(10, 8))
+fig, ax = plt.subplots(figsize=(10, 8))
+ax.set_xlabel("", fontsize=15)
+ax.set_ylabel("", fontsize=15)
+ax.tick_params(axis='both', labelsize=12)
 
 
 def sigma(coords, x, y, r):
@@ -20,7 +24,7 @@ def sigma(coords, x, y, r):
     return sqrt(sum_/len(coords))
 
 
-def hyper_fit(coords, IterMax=99, verbose=False):
+def hyper_fit(coords: list, IterMax= 99, verbose=False):
     """
     Fits coords to circle using hyperfit algorithm.
     Inputs:
@@ -107,78 +111,109 @@ def hyper_fit(coords, IterMax=99, verbose=False):
 
 def create_circle_tree(topics: list):
 
-    G = nx.Graph()
-
-    graph_label = " "
-    G.add_node(graph_label)
-    for i_t, topic in enumerate(topics):
-
-        topic_label = "Topic " + str(i_t + 1)
-        G.add_node(topic_label)
-
-        for w in topic:
-
-            G.add_node(w)
-            G.add_edge(w, topic_label)
-
-        G.add_edge(topic_label, graph_label)
-
-    pos = nx.circular_layout(G, scale=2)
-    pos[graph_label] = [0, 0]
-    for i_t, topic in enumerate(topics):
-        topic_label = "Topic " + str(i_t + 1)
-
-        topic_pos = [pos[graph_label]]
-        topic_pos.extend([pos[w] for w in topic])
-
-        t_x, t_y, _, _ = hyper_fit(topic_pos)
-
-        pos[topic_label] = [t_x, t_y]
+    graph = nx.Graph()
 
     norm = mpl.colors.Normalize(vmin=0, vmax=len(topics) + 2, clip=True)
     mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
-
     node_colors = []
-    for n in G.nodes:
 
-        if n == " ":
-            node_colors.append(mapper.to_rgba(0))
-            continue
+    node_num = 0
+    num_to_str = {}
+    topic_to_num = [[] for _ in range(len(topics))]
+    topic_nums = []
 
-        found_topic = False
-        for i_t, topic in enumerate(topics):
+    graph_num = node_num
+    graph.add_node(graph_num)
+    num_to_str.update({node_num: " "})
+    node_colors.append(mapper.to_rgba(0))
+    node_num += 1
 
-            if n in topic:
-                node_colors.append(mapper.to_rgba(i_t + 1))
-                found_topic = True
-                break
+    for i_t, topic in enumerate(topics):
 
-        if not found_topic:
-            topic_num = int(''.join(x for x in n if x.isdigit()))
-            # print("topic_num: " + str(topic_num))
+        topic_num = node_num
+        graph.add_node(topic_num)
+        num_to_str.update({node_num: "Topic " + str(i_t + 1)})
+        topic_nums.append(topic_num)
+        node_colors.append(mapper.to_rgba(i_t + 1))
+        node_num += 1
 
-            node_colors.append(mapper.to_rgba(int(topic_num)))
+        for w in topic:
 
-    assert len(node_colors) == len(G.nodes)
+            graph.add_node(node_num)
+            num_to_str.update({node_num: w})
+            topic_to_num[i_t].append(node_num)
+            node_colors.append(mapper.to_rgba(i_t + 1))
 
-    nx.draw(G, pos=pos, node_size=100, node_color=node_colors, linewidths=0.01,
-            font_size=15, with_labels=True, )
+            graph.add_edge(node_num, topic_num)
 
-    plt.show()
+            node_num += 1
+
+        graph.add_edge(topic_num, graph_num)
+
+    assert len(topic_nums) == len(topics)
+
+    pos = nx.circular_layout(graph, scale=2)
+    pos[graph_num] = [0, 0]
+    for i_t, topic_num in enumerate(topic_nums):
+
+        topic_pos = [pos[graph_num]]
+        topic_pos.extend([pos[num] for num in topic_to_num[i_t]])
+
+        t_x, t_y, _, _ = hyper_fit(topic_pos)
+
+        pos[topic_num] = [t_x, t_y]
+
+    nx.draw(graph, pos=pos, node_size=100, node_color=node_colors, linewidths=0.01,
+            font_size=15, with_labels=True, labels=num_to_str)
+
+    return plt
 
 
-def scatter_plot(x: list, ys: list) -> plt:
+def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: list) -> plt:
 
     assert isinstance(ys[0], list), "ys needs to be a list of list(s)"
+    assert len(ys) == len(color_legends), "need a color legend for each y list (ys)"
 
-    norm = mpl.colors.Normalize(vmin=0, vmax=len(ys) + 1, clip=True)
-    mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
-    ys_color = [mapper.to_rgba(i_y) for i_y,_ in enumerate(ys)]
+    mapper = mpl.cm.get_cmap('Pastel2')
+    ys_color = [mapper(i_y) for i_y,_ in enumerate(ys)]
 
     for i_y, y in enumerate(ys):
-        plt.plot(x, y, 'o', c=ys_color[i_y], markersize=20, linewidth=5)
+        plt.plot(x, y, 'o-', c=ys_color[i_y], markersize=17, linewidth=3, label=color_legends[i_y])
 
-    # plt.show()
+    y_ticks = [x/10 for x in range(0, 11, 1)]
+
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    ax.yaxis.set_ticks(y_ticks)
+    ax.xaxis.set_ticks(x)
+
+    ax.tick_params(axis='both', labelsize=12)
+
+    plt.legend(fontsize=13)
+    plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
+    return plt
+
+
+def box_plot(x: list, ys: list, labels: list, x_label: str, y_label: str):
+
+    assert isinstance(ys[0], list), "ys needs to be a list of list(s)"
+    assert len(ys) == len(labels), "need label for each y list (ys)"
+
+    mean_line_color = 'firebrick'
+    mean_line_width = 2
+
+    median_props = dict(linestyle='-', linewidth=0, color='white')
+    mean_line_props = dict(linestyle='-', linewidth=mean_line_width, color=mean_line_color)
+
+    plt.boxplot(ys, labels=labels, showmeans=True, meanline=True, meanprops=mean_line_props, medianprops=median_props)
+
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
+    mean_line_legend = [Line2D([0], [0], color=mean_line_color, linewidth=mean_line_width, linestyle='-')]
+    plt.legend(mean_line_legend, ["mean line"])
+
     return plt
 
 
@@ -231,5 +266,11 @@ def tsne_plot(clusters: list, cluster_embeddings: list,
 
 
 if __name__ == "__main__":
-    create_circle_tree([["word", "sadsa", "sdadas"], ["sadsa2", "eada", "1431324", "sasa"],
-                        ["aa", "tt"], ["adsada", "y"]])
+    # create_circle_tree([["word", "sadsa", "sdadas"], ["sadsa2", "eada", "1431324", "sasa"],
+    #                    ["aa", "tt"], ["adsada", "y"]])
+
+    # plt = scatter_plot([2, 4, 6], [[0.2, 0.5, 0.5], [0.4, 0.3, 0.6]], x_label="x axis", y_label="y axis",
+    #                   color_legends=["Topic 1", "Topic 2"])
+
+    plt = box_plot([0, 1], [[0.2, 0.5, 0.5], [0.4, 0.3, 0.6]], ["1", "2"], "x label", "y label")
+    plt.show()
