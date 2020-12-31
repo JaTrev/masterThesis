@@ -5,7 +5,7 @@ from scipy.spatial import distance
 import numpy as np
 
 
-def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v', top_n_words: int = 10) -> float:
+def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'u_mass', top_n_words: int = 10) -> float:
     """
     coherence_score calculates the coherence score based on the cluster_words and top_n_words.
 
@@ -32,23 +32,23 @@ def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v
     return cm.get_coherence()
 
 
-def davies_bouldin_index(topic_words: list) -> float:
+def davies_bouldin_index(topic_word_embeddings: list) -> float:
     """
-    davies_bouldin_index calculates the davies_bouldin_score based on the topic words
+    davies_bouldin_index calculates the davies_bouldin_score based on the topic word embeddings
 
-    :param topic_words: list of words for each topic
+    :param topic_word_embeddings: list of words for each topic
     :return: davies_bouldin_index
     """
 
-    temp_topic_words = []
+    temp_topic_words_embeddings = []
     temp_labels = []
 
-    for i_t, t_words in enumerate(topic_words):
+    for i_t, t_word_embeddings in enumerate(topic_word_embeddings):
 
-        temp_labels.append(i_t)
-        temp_topic_words.extend(t_words)
+        temp_labels.extend([i_t] * len(t_word_embeddings))
+        temp_topic_words_embeddings.extend(t_word_embeddings)
 
-    return sklearn.metrics.davies_bouldin_score(temp_topic_words, temp_labels)
+    return sklearn.metrics.davies_bouldin_score(temp_topic_words_embeddings, temp_labels)
 
 
 def compute_aic_bic(data_matrix, labels) -> (float, float):

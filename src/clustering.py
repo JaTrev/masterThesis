@@ -24,14 +24,15 @@ def spectral_clustering(word_embeddings: list, word_weights :list = None, params
     return model.fit_predict(word_embeddings, word_weights)
 
 
-def word_clusters(processed_docs: list, words: list, word_embeddings: list,
-                  clustering_type: str, params: dict, word_weights: list = None, n_words : int = 10) -> (list, list):
+def word_clusters(processed_docs: list, words: list, word_embeddings: list, vocab: list,
+                  clustering_type: str, params: dict, word_weights: list = None, n_words: int = 200) -> (list, list):
     """
     word_clusters returns a sorted list of words for each cluster
 
     :param processed_docs: list of preprocessed documents
     :param words: list of words
     :param word_embeddings: list of word embeddings
+    :param vocab: list of vocabulary words
     :param clustering_type: defines the clustering method ('kmeans', 'agglomerative', 'spectral')
     :param params: clustering parameters
     :param word_weights: word weighting used for clustering
@@ -55,7 +56,12 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list,
     cluster_words = [[] for _ in range(len(set(labels)))]
     cluster_embeddings = [[] for _ in range(len(cluster_words))]
     for l_id, l in enumerate(list(labels)):
-        cluster_words[l].append(words[l_id])
+
+        w = words[l_id]
+        if w not in vocab:
+            continue
+
+        cluster_words[l].append(w)
         cluster_embeddings[l].append(word_embeddings[l_id])
 
     # sort cluster_words

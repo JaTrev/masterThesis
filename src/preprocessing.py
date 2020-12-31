@@ -29,17 +29,11 @@ stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'car', 'lik
 stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really"])
 
 
-def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = False, vocab=False) -> list:
+def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = False) -> (list, list):
     """
     Document for processing a list of documents.
 
-    Returns:
-    - if vocab == False:
-      returns the preprocessed documents
-
-    - if vocab == True:
-      returns list of words (vocubalary)
-
+    Returns: preprocessed docs, vocabulary
     """
     print("---------")
     print("do_stemming: " + str(do_stemming))
@@ -82,7 +76,5 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
         new_docs.append(tkns)
         vocabulary.extend(tkns)
 
-    if vocab:
-        return sorted(list(set(vocabulary)))
-    else:
-        return new_docs
+    return new_docs, sorted(list(set(vocabulary)))
+
