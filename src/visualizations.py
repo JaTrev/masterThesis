@@ -5,7 +5,6 @@ import networkx as nx
 import numpy as np
 from math import sqrt
 from sklearn.manifold import TSNE
-import pylab
 
 
 def vis_prep():
@@ -126,7 +125,10 @@ def hyper_fit(coords: list, IterMax= 99, verbose=False):
     return x, y, r, s
 
 
-def create_circle_tree(topics: list):
+def create_circle_tree(topics: list, n_words: int = 10):
+
+    assert all([len(t) <= n_words for t in topics]), "each topic must have max. " + str(n_words) + " words"
+
     _, ax = plt.subplots(figsize=(40, 22))
     graph = nx.Graph()
 
@@ -134,29 +136,18 @@ def create_circle_tree(topics: list):
     mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.get_cmap('tab20'))
     node_colors = []
 
-    # node_num = 0
-    # num_to_str = {}
-    # topic_to_num = [[] for _ in range(len(topics))]
-    # topic_nums = []
-
-    # graph_num = node_num
     graph.add_nodes_from([(" ", {"topic": -1})])
-    # num_to_str.update({node_num: " "})
-    node_colors.append(mapper.to_rgba(0))
-    # node_num += 1
 
-    # try
+    node_colors.append(mapper.to_rgba(0))
+
     topic_id_to_nodes = {}
     for i_t, topic in enumerate(topics):
 
         topic_name = "Topic " + str(i_t + 1)
-        # topic_num = node_num
-        # graph.add_node(topic_num)
+
         graph.add_nodes_from([(topic_name, {"topic": i_t + 1})])
-        # num_to_str.update({node_num: "Topic " + str(i_t + 1)})
-        # topic_nums.append(topic_num)
         node_colors.append(mapper.to_rgba(i_t + 1))
-        # node_num += 1
+
 
         topic_nodes = []
         for w in topic:
@@ -174,10 +165,7 @@ def create_circle_tree(topics: list):
                 graph.add_nodes_from([(w, {"topic": i_t + 1})])
 
             topic_nodes.append(w)
-            # graph.add_node(node_num)
-            # graph.add_nodes_from([(node_num, {"topic": topic_num})])
-            # num_to_str.update({node_num: w})
-            # topic_to_num[i_t].append(node_num)
+
             node_colors.append(mapper.to_rgba(i_t + 1))
 
             graph.add_edge(w, topic_name)
@@ -264,7 +252,7 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
         plt.plot(x, y, 'o-', c=ys_color[i_y], markersize=17, linewidth=3, label=color_legends[i_y])
 
     if type == "u_mass":
-        y_ticks = [x for x in range(-14, 14, 2)]
+        y_ticks = [x for x in range(-6, 8, 2)]
     elif type == "c_v":
         y_ticks = [x / 10 for x in range(0, 11, 1)]
     elif type == "dbs":
@@ -273,8 +261,8 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
             all_y.extend((y))
         y_ticks = [x/10 for x in range(10, 40, 5)]
 
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
+    ax.set_xlabel(x_label, fontsize='medium')
+    ax.set_ylabel(y_label, fontsize='medium')
 
     ax.yaxis.set_ticks(y_ticks)
     ax.xaxis.set_ticks(x)
@@ -284,6 +272,20 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     plt.legend(fontsize='x-small')
     plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
     return plt, fig
+
+
+def write_topics(topics: list, filename: str, n_words: int = 10):
+    assert(all(len(t) <= n_words for t in topics)), "each topic can only have max. " + str(n_words) + " words!"
+
+    with open(filename, "w") as myFile:
+
+        for i, t in enumerate(topics):
+            myFile.write('Topic ' + str(i+1) + '\n')
+
+            for w in t:
+                myFile.write(w + ' ')
+
+            myFile.write('\n\n\n')
 
 
 def box_plot(ys: list, labels: list, x_label: str, y_label: str):
@@ -364,14 +366,17 @@ if __name__ == "__main__":
     # create_circle_tree([["word", "sadsa", "sdadas"], ["sadsa2", "eada", "1431324", "sasa"],
     #                    ["aa", "tt"], ["adsada", "y"]])
 
-    #plt, fig = scatter_plot([2, 4, 6], [[0.2, 0.5, 0.5], [0.4, 0.3, 0.6]], x_label="x axis", y_label="y axis",
-    #                   color_legends=["Topic 1", "Topic 2"])
+    # plt, fig = scatter_plot([2, 4, 6], [[0.2, 0.5, 0.5], [0.4, 0.3, 0.6]], x_label="x axis", y_label="y axis",
+    #                    color_legends=["Topic 1", "Topic 2"], type='c_v')
+
 
     #plt = box_plot([0, 1], [[0.2, 0.5, 0.5], [0.4, 0.3, 0.6]], ["1", "2"], "x label", "y label")
-    #plt.show()
+    # plt.show()
     #fig.savefig("visuals/cs_baseline_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    G = nx.cycle_graph(80)
+    # write_topics([["this", "that", "those"], ["cat", "dog", "ant"]], "text.txt")
+
+    """G = nx.cycle_graph(80)
     pos = nx.circular_layout(G)
     pylab.figure(1)
     nx.draw(G, pos)
@@ -379,4 +384,4 @@ if __name__ == "__main__":
     nx.draw(G, pos, node_size=60, font_size=8)
     pylab.figure(3, figsize=(12, 12))
     nx.draw(G, pos)
-    pylab.show()
+    pylab.show()"""

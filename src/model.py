@@ -54,8 +54,9 @@ def lda_mallet_topics(processed_data: list, n_topics: int = 10, n_words: int = 1
     return topics
 
 
-def nmf_topics(preprocessed_data: list, n_topics: int = 10, n_features: int = 200,
-               n_words:int = 10, init: str = 'nndsvd', solver: str = 'mu', beta_loss='kullback-leibler',use_tfidf: bool = True):
+def nmf_topics(preprocessed_data: list, vocabulary: list, n_topics: int = 10,
+               n_words: int = 10, init: str = 'nndsvd', solver: str = 'cd', beta_loss: str = 'frobenius',
+               use_tfidf: bool = True):
 
     assert init in [None, 'random', 'nndsvd', 'nndsvda', 'nndsvdar'], "need an appropriate method to init to procedure"
     assert solver in ['mu', 'cd'], "need an appropriate solver"
@@ -64,15 +65,13 @@ def nmf_topics(preprocessed_data: list, n_topics: int = 10, n_features: int = 20
     raw_docs = [str_split.join(doc) for doc in preprocessed_data]
 
     if use_tfidf:
-        tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,
-                                           max_features=n_features,
+        tfidf_vectorizer = TfidfVectorizer(vocabulary=vocabulary,
                                            stop_words='english')
         new_data = tfidf_vectorizer.fit_transform(raw_docs)
         feature_names = tfidf_vectorizer.get_feature_names()
 
     else:
-        tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
-                                        max_features=n_features,
+        tf_vectorizer = CountVectorizer(vocabulary=vocabulary,
                                         stop_words='english')
         new_data = tf_vectorizer.fit_transform(raw_docs)
         feature_names = tf_vectorizer.get_feature_names()

@@ -4,6 +4,8 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import stopwords
 from stop_words import get_stop_words
 import nltk
+from collections import Counter
+
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
@@ -29,7 +31,8 @@ stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'car', 'lik
 stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really"])
 
 
-def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = False) -> (list, list):
+def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = False,
+                  remove_low_freq: bool = False) -> (list, list):
     """
     Document for processing a list of documents.
 
@@ -54,14 +57,12 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
         # remove all tokens that are just digits
         tkns = [w for w in tkns if w.isalpha()]
 
-        # remove stop words
+        # remove stop words before stemming/lemmatizing
         tkns = [w for w in tkns if w not in stop_words]
 
         # remove all words that are not nouns
-        tkns = [w for (w, pos) in nltk.pos_tag(tkns) if pos in ['NN',
-                                                                'NNP',
-                                                                'NNS',
-                                                                'NNPS']]
+        tkns = [w for (w, pos) in nltk.pos_tag(tkns) if pos in ['NN', 'NNP', 'NNS', 'NNPS']]
+
         # stemming
         if do_stemming:
             tkns = [PorterStemmer().stem(w) for w in tkns]
@@ -75,6 +76,32 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
 
         new_docs.append(tkns)
         vocabulary.extend(tkns)
+
+    if remove_low_freq:
+        # remove low-frequency terms
+
+        temp_new_docs = []
+        for d in new_docs:
+            temp_new_docs.extend(d)
+        counter = Counter(temp_new_docs)
+
+        l_threshold = 1
+
+        docs_threshold = []
+        vocab_threshold = []
+        for d in new_docs:
+
+            d_threshold = [w for w in d if counter[w] > l_threshold]
+            if len(d_threshold) > 0:
+                docs_threshold.append(d_threshold)
+                vocab_threshold.extend(d_threshold)
+
+        print("vocab threshold len: " + str(len(vocab_threshold)))
+        print("vocab withouth threshold len: " + str(len(vocabulary)))
+        new_docs = docs_threshold
+        vocabulary = vocab_threshold
+
+
 
     return new_docs, sorted(list(set(vocabulary)))
 

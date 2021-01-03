@@ -26,16 +26,6 @@ all_data.extend(new_test_data)
 # TODO: create a main() function
 
 
-"""
-topics = nmf_topics(all_data_processed, n_topics=10, solver='cd', beta_loss='frobenius', use_tfidf=False)
-
-g, plt = create_circle_tree(topics)
-nx.write_graphml(g, "test.graphml")
-fig = plt.gcf()
-fig.savefig('visuals/test.pdf', dpi=100, transparent=True)
-
-assert 0
-"""
 def number_of_words_per_doc():
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -56,6 +46,7 @@ def number_of_words_per_doc():
     ax.xaxis.grid(alpha=0)
     plt.margins(0)
 
+    all_data_lengths = [len([w for w in doc.split() if w.isalpha()]) for doc in new_data]
     data_lengths_c = [all_data_lengths.count(int(i)) for i in range(int(np.max(all_data_lengths)))]
     plt.bar(range(int(np.max(all_data_lengths))), data_lengths_c, color="black")
 
@@ -72,9 +63,9 @@ def number_of_words_per_doc():
     fig.savefig("visuals/document_word_distribution.pdf", bbox_inches='tight', transparent=True)
 
 
-def vis_most_common_words(corpus = None):
-    if corpus == None:
-        corpus = [doc.split() for doc in all_data]
+def vis_most_common_words(data: list):
+    # if corpus == None:
+    #    corpus = [doc.split() for doc in all_data]
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -96,7 +87,7 @@ def vis_most_common_words(corpus = None):
     plt.margins(0)
 
     data_words = []
-    for doc in corpus:
+    for doc in data:
         data_words.extend([w.lower() for w in doc if w.isalpha()])
 
     data_words_c = Counter(data_words)
@@ -106,7 +97,7 @@ def vis_most_common_words(corpus = None):
 
     plt.bar(most_common_words, most_common_words_c, color='black', width=0.5)
 
-    plt.ylim(top=1000) # most_common_words_c[0])
+    plt.ylim(top=1000)
     plt.ylim(bottom=0)
 
     ax.set_xlabel("Top 30 Words", fontsize="medium")
@@ -116,80 +107,98 @@ def vis_most_common_words(corpus = None):
 
     fig.savefig("visuals/processed_most_common_words.pdf", bbox_inches='tight', transparent=True)
 
-def get_baseline_vis(all_data_processed: list):
-    x = list(range(2, 22, 2))
-    y_nmf = []
-    best_nmf_cs = 0
-    best_nmf_topics = None
 
-    y_lsa = []
-    best_lsa_cs = 0
-    best_lsa_topics = None
+def get_baseline_vis(all_data_processed: list, vocab: list, x: list = None):
+    if x is None:
+        x = list(range(2, 22, 2))
+    else:
+        assert isinstance(x, list), "x has to be a list of ks"
 
-    y_lda = []
-    best_lda_cs = 0
-    best_lda_topics = None
+    k_10_c_v = {'nmf_tf': 0, 'nmf_tf_idf': 0, 'lda': 0, 'lda_mallet': 0}
+    best_c_v = {'nmf_tf': 0, 'nmf_tf_idf': 0, 'lda': 0, 'lda_mallet': 0}
+    k_10_topics = {'nmf_tf': None, 'nmf_tf_idf': None, 'lda': None, 'lda_mallet': None}
+    best_c_v_topics = {'nmf_tf': None, 'nmf_tf_idf': None, 'lda': None, 'lda_mallet': None}
 
-    y_lda_mallet = []
-    best_lda_mallet_cs = 0
-    best_lda_mallet_topics = None
+    y_c_v_models = {'nmf_tf': [], 'nmf_tf_idf': [], 'lda': [], 'lda_mallet': []}
+    y_u_mass_models = {'nmf_tf': [], 'nmf_tf_idf': [], 'lda': [], 'lda_mallet': []}
 
     for n_topic in x:
-        topics = nmf_topics(all_data_processed, n_topics=n_topic, solver='cd', beta_loss='frobenius', use_tfidf=False)
-        cs = coherence_score(all_data_processed, topics)
-        y_nmf.append(cs)
-        if cs > best_nmf_cs:
-            best_nmf_cs = cs
-            best_nmf_topics = topics
 
-        topics = lsa_topics(all_data_processed, n_topics=n_topic)
-        cs = coherence_score(all_data_processed, topics)
-        y_lsa.append(cs)
-        if cs > best_lsa_cs:
-            best_lsa_cs = cs
-            best_lsa_topics = topics
+        for m in list(best_c_v.keys()):
 
-        topics = lda_topics(all_data_processed, n_topics=n_topic)
-        cs = coherence_score(all_data_processed, topics)
-        y_lda.append(cs)
-        if cs > best_lda_cs:
-            best_lda_cs = cs
-            best_lda_topics = topics
+            if m == 'nmf_tf':
+                topics = nmf_topics(all_data_processed, vocabulary=vocab, n_topics=n_topic, solver='cd',
+                                    beta_loss='frobenius', use_tfidf=False)
+            elif m == 'nmf_tf_idf':
+                topics = nmf_topics(all_data_processed, vocabulary=vocab, n_topics=n_topic, solver='cd',
+                                    beta_loss='frobenius', use_tfidf=True)
+            elif m == 'lda':
+                topics = lda_topics(all_data_processed, n_topics=n_topic)
 
-        topics = lda_mallet_topics(all_data_processed, n_topics=n_topic)
-        cs = coherence_score(all_data_processed, topics)
-        y_lda_mallet.append(cs)
-        if cs > best_lda_mallet_cs:
-            best_lda_mallet_cs = cs
-            best_lda_mallet_topics = topics
+            elif m == 'lda_mallet':
+                topics = lda_mallet_topics(all_data_processed, n_topics=n_topic)
 
-    ys = [y_nmf, y_lsa, y_lda, y_lda_mallet]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score",
-                          color_legends=["NMF", "LSA", "LDA", "LDA MALLET"])
+            else:
+                topics = []
+                assert m in best_c_v.keys()
 
-    fig.savefig("visuals/cs_baseline_vs_k.pdf", bbox_inches='tight', transparent=True)
+            # c_v coherence score
+            cs_c_v = coherence_score(all_data_processed, topics, cs_type='c_v')
+            y_c_v_models[m].append(cs_c_v)
+            if cs_c_v > best_c_v[m]:
+                best_c_v[m] = cs_c_v
+                best_c_v_topics[m] = topics
 
-    g, plt = create_circle_tree(best_nmf_topics)
-    fig = plt.gcf()
-    fig.savefig('visuals/best_nmf.pdf', dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/best_nmf.graphml")
+            # u_mass coherence score
+            cs_u_mass = coherence_score(all_data_processed, topics, cs_type='u_mass')
+            y_u_mass_models[m].append(cs_u_mass)
 
-    g, plt = create_circle_tree(best_lsa_topics)
-    fig = plt.gcf()
-    fig.savefig('visuals/best_lsa.pdf', dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/best_lsa.graphml")
+            if n_topic == 10:
+                k_10_c_v[m] = cs_c_v
+                k_10_topics[m] = topics
 
-    g, plt = create_circle_tree(best_lda_topics)
-    fig = plt.gcf()
-    fig.savefig('visuals/best_lda.pdf', dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/best_lda.graphml")
+    print("best c_v scores:")
+    for m, b_cs in best_c_v.items():
+        print(str(m) + ": " + str(b_cs))
 
-    g, plt = create_circle_tree(best_lda_mallet_topics)
-    fig = plt.gcf()
-    fig.savefig('visuals/best_lda_mallet.pdf', dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/best_lda_mallet.graphml")
+    print()
+    print("k=10 c_v scores:")
+    for m, cs_score in k_10_c_v.items():
+        print(str(m) + ": " + str(cs_score))
 
-def w2v_visualizsation(all_data_processed, vocab):
+    # c_v coherence score
+    ys = [l for l in y_c_v_models.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=["NMF TF", "NMF TF-IDF", "LDA", "LDA MALLET"], type='c_v')
+    fig.savefig("visuals/c_v_baseline_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_models.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (u_mass)",
+                          color_legends=["NMF TF", "NMF TF-IDF", "LDA", "LDA MALLET"], type='u_mass')
+    fig.savefig("visuals/u_mass_baseline_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # best_c_v_topics_lengths = {'nmf_tf': None, 'nmf_tf_idf': None, 'lda': None, 'lda_mallet': None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
+
+        # k = 10 model
+        g, plt = create_circle_tree(k_10_topics[m])
+        nx.write_graphml(g, "visuals/k=10_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        # best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics(topics, "visuals/best_" + str(m) + ".txt")
+        # write k = 10 model
+        write_topics(k_10_topics[m], "visuals/k=10_" + str(m) + ".txt")
+
+
+def w2v_visualization(all_data_processed, vocab):
     words, word_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
 
     word_similarities = get_word_similarities(word_embeddings)
@@ -319,6 +328,11 @@ def w2v_visualizsation(all_data_processed, vocab):
 
 
 if __name__ == "__main__":
-    # all_data_lengths = [len([w for w in doc.split() if w.isalpha()]) for doc in new_data]
-    all_data_processed, vocab = preprocessing(all_data, do_stemming=True)
-
+    all_data_processed, vocab = preprocessing(all_data, do_stemming=True,
+                                              do_lemmatizing=False,
+                                              remove_low_freq=True)
+    #
+    get_baseline_vis(all_data_processed, vocab)
+    # vis_most_common_words(all_data_processed)
+    # print("Trying Lemmatizing")
+    # w2v_visualizsation(all_data_processed, vocab)
