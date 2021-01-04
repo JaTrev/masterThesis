@@ -198,11 +198,23 @@ def get_baseline_vis(all_data_processed: list, vocab: list, x: list = None):
         write_topics(k_10_topics[m], "visuals/k=10_" + str(m) + ".txt")
 
 
-def w2v_visualization(all_data_processed, vocab):
+def w2v_visualization(all_data_processed: list, vocab: list):
     words, word_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
 
-    word_similarities = get_word_similarities(word_embeddings)
+    clusters_words, clusters_words_embeddings = word_clusters(all_data_processed, words, word_embeddings, vocab,
+                                                              clustering_type="kmeans",
+                                                              params={'n_clusters': 10, 'random_state': 42, },
+                                                              clustering_weight_type=None,
+                                                              ranking_weight_type='tf')
 
+    cs = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
+    dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
+    print("Coherence score (c_v): " + str(cs))
+    print("Davies Bouldin Index " + str(dbs))
+
+
+    """
+    # word_similarities = get_word_similarities(word_embeddings)
     # 'kmeans', 'agglomerative', 'spectral'
     x = list(range(2, 22, 2))
     y_kmeans_cs = []
@@ -325,14 +337,13 @@ def w2v_visualization(all_data_processed, vocab):
                           color_legends=["K-Means", "Agglomerative",
                                          "K-Means + Sim", "Agglomerative + Sim"])
     fig.savefig("visuals/scatter_plot_w2v_sim_dbs.pdf", dpi=100, transparent=True)
+    """
 
 
 if __name__ == "__main__":
-    all_data_processed, vocab = preprocessing(all_data, do_stemming=True,
-                                              do_lemmatizing=False,
-                                              remove_low_freq=True)
+    all_data_processed, vocab = preprocessing(all_data, do_stemming=False, do_lemmatizing=True, remove_low_freq=False)
     #
-    get_baseline_vis(all_data_processed, vocab)
+    # get_baseline_vis(all_data_processed, vocab)
     # vis_most_common_words(all_data_processed)
     # print("Trying Lemmatizing")
-    # w2v_visualizsation(all_data_processed, vocab)
+    w2v_visualization(all_data_processed, vocab)

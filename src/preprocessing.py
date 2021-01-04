@@ -41,6 +41,7 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
     print("---------")
     print("do_stemming: " + str(do_stemming))
     print("do_lemmatizing: " + str(do_lemmatizing))
+    print("remove_low_freq: " + str(remove_low_freq))
     print("---------")
 
     vocabulary = []
