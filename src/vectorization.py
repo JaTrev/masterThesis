@@ -1,6 +1,8 @@
 from gensim.models import Word2Vec
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
+import os
 
 
 def get_saved_w2v_model(w2v_model: str) -> Word2Vec:
@@ -88,6 +90,37 @@ def get_tf_idf(processed_data: list):
     tfidf_matrix = tfidf_vectorizer.fit_transform(data_strings)
 
     return tfidf_matrix
+
+
+def glove_embeddings(vocab: list):
+    # get glove embeddings
+    print("Getting GloVe embeddings!")
+
+    embeddings_index = {}
+    f = open(os.path.join('data/', 'glove.840B.300d.txt'), encoding="utf8")
+    for line in f:
+        values = line.split()
+        word = values[0]
+
+        try:
+            embeddings_index[word] = np.asarray(values[1:], dtype='float32')
+        except ValueError:
+            print("couldn't include:")
+            print(word)
+    f.close()
+
+    glove_words = list(embeddings_index.keys())
+    vocab_embeddings = []
+    new_vocab = []
+
+    for w in vocab:
+        if w in glove_words:
+
+            new_vocab.append(w)
+            vocab_embeddings.append(embeddings_index[w])
+
+    print("glove vocab has " + str(len(vocab) - len(new_vocab)) + " words less")
+    return new_vocab, vocab_embeddings
 
 
 if __name__ == "__main__":

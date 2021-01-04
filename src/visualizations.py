@@ -127,7 +127,9 @@ def hyper_fit(coords: list, IterMax= 99, verbose=False):
 
 def create_circle_tree(topics: list, n_words: int = 10):
 
-    assert all([len(t) <= n_words for t in topics]), "each topic must have max. " + str(n_words) + " words"
+    if any([len(t) > n_words for t in topics]):
+        new_topics = [t[:10] for t in topics]
+        topics = new_topics
 
     _, ax = plt.subplots(figsize=(40, 22))
     graph = nx.Graph()
@@ -275,7 +277,9 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
 
 
 def write_topics(topics: list, filename: str, n_words: int = 10):
-    assert(all(len(t) <= n_words for t in topics)), "each topic can only have max. " + str(n_words) + " words!"
+    if any([len(t) > n_words for t in topics]):
+        new_topics = [t[:10] for t in topics]
+        topics = new_topics
 
     with open(filename, "w") as myFile:
 

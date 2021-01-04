@@ -33,8 +33,6 @@ def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: li
     n_words = len([w for doc in processed_docs for w in doc])
     clusters_vocab = list(set([w for c_words in cluster_words for w in c_words]))
 
-    print("n_words: " + str(n_words))
-
     word_weights = get_word_weights(processed_docs, vocab=clusters_vocab, n_words=n_words, weight_type=weight_type)
 
     # calculate cluster centers

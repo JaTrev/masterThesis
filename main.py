@@ -198,146 +198,106 @@ def get_baseline_vis(all_data_processed: list, vocab: list, x: list = None):
         write_topics(k_10_topics[m], "visuals/k=10_" + str(m) + ".txt")
 
 
-def w2v_visualization(all_data_processed: list, vocab: list):
-    words, word_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
+def w2v_visualization(all_data_processed: list, vocab: list, x: list = None):
 
-    clusters_words, clusters_words_embeddings = word_clusters(all_data_processed, words, word_embeddings, vocab,
-                                                              clustering_type="kmeans",
-                                                              params={'n_clusters': 10, 'random_state': 42, },
-                                                              clustering_weight_type=None,
-                                                              ranking_weight_type='tf')
+    if x is None:
+        x = list(range(2, 22, 2))
 
-    cs = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
-    dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-    print("Coherence score (c_v): " + str(cs))
-    print("Davies Bouldin Index " + str(dbs))
+    else:
+        assert(x, list)
 
+    # words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
+    words, word_embeddings = glove_embeddings(vocab)
 
-    """
-    # word_similarities = get_word_similarities(word_embeddings)
-    # 'kmeans', 'agglomerative', 'spectral'
-    x = list(range(2, 22, 2))
-    y_kmeans_cs = []
-    y_kmeans_dbs = []
-    best_kmeans_cs = 0
-    best_kmeans_topics = None
+    k_10_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
+    best_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
+    k_10_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
+    best_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
 
-    y_agglo_cs = []
-    y_agglo_dbs = []
-    best_agglo_cs = 0
-    best_agglo_topics = None
-
-    y_kmeans_sim_cs = []
-    y_kmeans_sim_dbs = []
-    best_kmeans_sim_cs = 0
-    best_kmeans_sim_topics = None
-
-    y_agglo_sim_cs = []
-    y_agglo_sim_dbs = []
-    best_agglo_sim_cs = 0
-    best_agglo_sim_topics = None
+    y_c_v_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
+    y_dbs_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
+    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
 
     for k in x:
-        # kmeans
-        clusters_words, clusters_words_embeddings = word_clusters(all_data_processed, words, word_embeddings, vocab,
-                                                                  clustering_type="kmeans",
-                                                                  params={'n_clusters': k, 'random_state': 42, })
 
-        cs = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
-        dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-        y_kmeans_cs.append(cs)
-        y_kmeans_dbs.append(dbs)
-        if best_kmeans_cs < cs or best_kmeans_cs == 0:
-            best_kmeans_cs = cs
-            best_kmeans_topics = clusters_words
+        for cluster_type in ["kmeans", "agglomerative", "spectral"]:
 
-        # agglomerative
-        clusters_words, clusters_words_embeddings = word_clusters(all_data_processed, words, word_embeddings, vocab,
-                                                                  clustering_type="agglomerative",
-                                                                  params={'n_clusters': k, })
-        cs = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
-        dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-        y_agglo_cs.append(cs)
-        y_agglo_dbs.append(dbs)
+            if cluster_type == "kmeans":
+                clustering_params = {'n_clusters': k, 'random_state': 42, }
+            else:
+                clustering_params = {'n_clusters': k}
 
-        if best_agglo_cs < cs or best_agglo_cs == 0:
-            best_agglo_cs = cs
-            best_agglo_topics = clusters_words
+            clusters_words, clusters_words_embeddings = word_clusters(
+                all_data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
+                params=clustering_params, clustering_weight_type='tf', ranking_weight_type='tf'
+            )
 
-        # kmeans similarity embeddings
-        clusters_words, clusters_words_embeddings = word_clusters(all_data_processed, words, word_similarities, vocab,
-                                                                  clustering_type="kmeans",
-                                                                  params={'n_clusters': k, 'random_state': 42, })
-        cs = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
-        dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-        y_kmeans_sim_cs.append(cs)
-        y_kmeans_sim_dbs.append(dbs)
+            cs_c_v = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
+            dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
+            cs_u_mass = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='u_mass')))
 
-        if best_kmeans_sim_cs < cs or best_kmeans_sim_cs == 0:
-            best_kmeans_sim_cs = cs
-            best_kmeans_sim_topics = clusters_words
+            y_c_v_clustering_type[cluster_type].append(cs_c_v)
+            y_u_mass_clustering_type[cluster_type].append(cs_u_mass)
+            y_dbs_clustering_type[cluster_type].append(dbs)
 
-        # agglomerative similarities embedding
-        clusters_words, clusters_words_embeddings = word_clusters(all_data_processed, words, word_similarities, vocab,
-                                                                  clustering_type="agglomerative",
-                                                                  params={'n_clusters': k, })
-        cs = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
-        dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-        y_agglo_sim_cs.append(cs)
-        y_agglo_sim_dbs.append(dbs)
+            if cs_c_v > best_c_v[cluster_type]:
+                best_c_v[cluster_type] = cs_c_v
+                best_c_v_topics[cluster_type] = clusters_words
 
-        if best_agglo_sim_cs < cs or best_agglo_sim_cs == 0:
-            best_agglo_sim_cs = cs
-            best_agglo_sim_topics = clusters_words
+            if k == 10:
+                k_10_c_v[cluster_type] = cs_c_v
+                k_10_topics[cluster_type] = clusters_words
 
-    # w2v, kmeans
-    g, plt = create_circle_tree([c[:10] for c in best_kmeans_topics])
-    fig = plt.gcf()
-    fig.savefig("visuals/w2v_kmeans_cs" + str(best_kmeans_cs) + ".pdf", dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/w2v_kmeans_cs" + str(best_kmeans_cs) + ".graphml")
+    print("best c_v scores:")
+    for m, b_cs in best_c_v.items():
+        print(str(m) + ": " + str(b_cs))
 
-    # w2v, agglomerative
-    g, plt = create_circle_tree([c[:10] for c in best_agglo_topics])
-    fig = plt.gcf()
-    fig.savefig("visuals/w2v_agglo_cs" + str(best_agglo_cs) + ".pdf", dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/w2v_agglo_cs" + str(best_agglo_cs) + ".graphml")
+    print()
+    print("k=10 c_v scores:")
+    for m, cs_score in k_10_c_v.items():
+        print(str(m) + ": " + str(cs_score))
 
-    # similarities, kmeans
-    g, plt = create_circle_tree([c[:10] for c in best_kmeans_sim_topics])
-    fig = plt.gcf()
-    fig.savefig("visuals/w2v_kmeans_sim_cs" + str(best_kmeans_sim_cs) + ".pdf", dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/w2v_kmeans_sim_cs" + str(best_kmeans_sim_cs) + ".graphml")
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='c_v')
+    fig.savefig("visuals/c_v_glove_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # similarities, agglomerative
-    g, plt = create_circle_tree([c[:10] for c in best_agglo_sim_topics])
-    fig = plt.gcf()
-    fig.savefig("visuals/w2v_agglo_sim_cs" + str(best_agglo_sim_cs) + ".pdf", dpi=100, transparent=True)
-    nx.write_graphml(g, "visuals/w2v_agglo_sim_cs" + str(best_agglo_sim_cs) + ".graphml")
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (u_mass)",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='u_mass')
+    fig.savefig("visuals/u_mass_glove_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # box plot
-    best_topics_lengths = []
-    best_topics_lengths.append([len(t) for t in best_kmeans_topics])
-    best_topics_lengths.append([len(t) for t in best_agglo_topics])
-    best_topics_lengths.append([len(t) for t in best_kmeans_sim_topics])
-    best_topics_lengths.append([len(t) for t in best_agglo_sim_topics])
-    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "K-Means+S", "Agglomerative+S"],
-                      "Clustering Types", "Topic Lengths")
-    fig.savefig("visuals/box_plot_w2v_sim.pdf", dpi=100, transparent=True)
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='dbs')
+    fig.savefig("visuals/dbi_glove_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    ys = [y_kmeans_cs, y_agglo_cs, y_kmeans_sim_cs, y_agglo_sim_cs]
-    print(ys)
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score", type="c_v",
-                          color_legends=["K-Means", "Agglomerative",
-                                         "K-Means + Sim", "Agglomerative + Sim"])
-    fig.savefig("visuals/scatter_plot_w2v_sim_cs.pdf", dpi=100, transparent=True)
+    best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None, "spectral": None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
 
-    ys = [y_kmeans_dbs, y_agglo_dbs, y_kmeans_sim_dbs, y_agglo_sim_dbs]
-    print(ys)
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies-Bouldin Score", type="dbs",
-                          color_legends=["K-Means", "Agglomerative",
-                                         "K-Means + Sim", "Agglomerative + Sim"])
-    fig.savefig("visuals/scatter_plot_w2v_sim_dbs.pdf", dpi=100, transparent=True)
-    """
+        # k = 10 model
+        g, plt = create_circle_tree(k_10_topics[m])
+        nx.write_graphml(g, "visuals/k=10_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics(topics, "visuals/best_" + str(m) + ".txt")
+        # write k = 10 model
+        write_topics(k_10_topics[m], "visuals/k=10_" + str(m) + ".txt")
+
+    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
+    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "Spectral"], "Clustering Types",
+                      "Topic Lengths")
+    fig.savefig("visuals/box_plot_glove.pdf", dpi=100, transparent=True)
 
 
 if __name__ == "__main__":
@@ -346,4 +306,7 @@ if __name__ == "__main__":
     # get_baseline_vis(all_data_processed, vocab)
     # vis_most_common_words(all_data_processed)
     # print("Trying Lemmatizing")
+
+    # new_vocab, vocab_embeddings = glove_embeddings(vocab)
+
     w2v_visualization(all_data_processed, vocab)
