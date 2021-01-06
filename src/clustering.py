@@ -120,7 +120,23 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
         cluster_words[l].append(w)
         cluster_embeddings[l].append(word_embeddings[l_id])
 
-    return sort_words(processed_docs, cluster_words, cluster_embeddings, weight_type=ranking_weight_type)
+    # remove clusters with < 5 words:
+    cleaned_cluster_words = []
+    cleaned_cluster_embeddings = []
+    for i_c, c in enumerate(cluster_words):
+
+        if len(c) <= 5:
+            continue
+        cleaned_cluster_words.append(c)
+        cleaned_cluster_embeddings.append(cluster_embeddings[i_c])
+
+    # if no clusters have >= 6 words
+    if len(cleaned_cluster_words) == 0:
+        cleaned_cluster_words.append([w for c in cluster_words for w in c])
+        cleaned_cluster_embeddings.append([emb for c in cluster_embeddings for emb in c])
+
+    return sort_words(processed_docs, cleaned_cluster_words,
+                      cleaned_cluster_embeddings, weight_type=ranking_weight_type)
 
 
 if __name__ == "__main__":
