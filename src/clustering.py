@@ -120,7 +120,7 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
         cluster_words[l].append(w)
         cluster_embeddings[l].append(word_embeddings[l_id])
 
-    # remove clusters with < 5 words:
+    # remove clusters with <= 5 words:
     cleaned_cluster_words = []
     cleaned_cluster_embeddings = []
     for i_c, c in enumerate(cluster_words):
@@ -143,6 +143,6 @@ if __name__ == "__main__":
     docs = [["a", "asa", "asa"], ["a", "a", "aa"]]
 
     # calculate words frequencies per document
-    # word_frequencies_per_doc = [Counter(doc) for doc in docs]
+    word_frequencies_per_doc = [Counter(doc) for doc in docs]
 
     # calculate document frequency

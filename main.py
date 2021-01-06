@@ -224,6 +224,9 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
     k_10_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
     best_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
 
+    worst_c_v = {"kmeans": 1, "agglomerative": 1, "spectral": 1}
+    worst_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
+
     y_c_v_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
     y_dbs_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
     y_u_mass_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
@@ -255,6 +258,10 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
             if cs_c_v > best_c_v[cluster_type]:
                 best_c_v[cluster_type] = cs_c_v
                 best_c_v_topics[cluster_type] = clusters_words
+
+            if cs_c_v < worst_c_v[cluster_type]:
+                worst_c_v[cluster_type] = cs_c_v
+                worst_c_v_topics[cluster_type] = clusters_words
 
             if k == 10:
                 k_10_c_v[cluster_type] = cs_c_v
@@ -302,9 +309,13 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
         best_c_v_topics_lengths[m] = [len(t) for t in topics]
 
         # write topics
-        write_topics(topics, "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(topics, best_c_v[m], m,
+                         "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], m,
+                         "visuals/worst_" + str(m) + ".txt")
         # write k = 10 model
-        write_topics(k_10_topics[m], "visuals/k=10_" + str(m) + ".txt")
+        write_topics_viz(k_10_topics[m], k_10_c_v[m], m,
+                         "visuals/k=10_" + str(m) + ".txt")
 
     best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
     _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "Spectral"], "Clustering Types",
@@ -312,9 +323,9 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
     fig.savefig("visuals/box_plot_w2v.pdf", dpi=100, transparent=True)
 
 
-def w2v_ablation(all_data_processed: list, vocab: list, x: list = None):
-    x_label = "Window Size"
-    file_save_under = "win"
+def w2v_ablation(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
+    x_label = "Minimum Count"
+    file_save_under = "min"
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
 
@@ -333,12 +344,15 @@ def w2v_ablation(all_data_processed: list, vocab: list, x: list = None):
     orig = w2v_model.window
     print(orig)
 
-    best_neg = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
+    best_var = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
     best_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
 
-    y_c_v_negative = {"kmeans": [], "agglomerative": [], "spectral": []}
-    y_dbs_negative = {"kmeans": [], "agglomerative": [], "spectral": []}
-    y_u_mass_negative = {"kmeans": [], "agglomerative": [], "spectral": []}
+    worst_var = {"kmeans": 1, "agglomerative": 1, "spectral": 1}
+    worst_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
+
+    y_c_v_var = {"kmeans": [], "agglomerative": [], "spectral": []}
+    y_dbs_var = {"kmeans": [], "agglomerative": [], "spectral": []}
+    y_u_mass_var = {"kmeans": [], "agglomerative": [], "spectral": []}
 
     for k in x:
 
@@ -359,39 +373,44 @@ def w2v_ablation(all_data_processed: list, vocab: list, x: list = None):
                 ranking_weight_type=ranking_weight_type
             )
 
-            cs_c_v = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='c_v')))
+            cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
             dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-            cs_u_mass = float("{:.2f}".format(coherence_score(all_data_processed, clusters_words, cs_type='u_mass')))
+            # cs_u_mass = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='u_mass')))
+            cs_npmi = average_npmi_topics(all_data_processed, clusters_words, len(clusters_words))
 
-            y_c_v_negative[cluster_type].append(cs_c_v)
-            y_u_mass_negative[cluster_type].append(cs_u_mass)
-            y_dbs_negative[cluster_type].append(dbs)
+            y_c_v_var[cluster_type].append(cs_c_v)
+            y_u_mass_var[cluster_type].append(cs_npmi)
+            y_dbs_var[cluster_type].append(dbs)
 
-            if cs_c_v > best_neg[cluster_type]:
-                best_neg[cluster_type] = cs_c_v
+            if cs_c_v > best_var[cluster_type]:
+                best_var[cluster_type] = cs_c_v
                 best_c_v_topics[cluster_type] = clusters_words
+
+            if cs_c_v < worst_var[cluster_type]:
+                worst_var[cluster_type] = cs_c_v
+                worst_c_v_topics[cluster_type] = clusters_words
 
             if k == orig:
                 print(str(cluster_type) + ": " + str(cs_c_v))
 
     print("best c_v scores:")
-    for m, b_cs in best_neg.items():
+    for m, b_cs in best_var.items():
         print(str(m) + ": " + str(b_cs))
 
     # c_v coherence score
-    ys = [l for l in y_c_v_negative.values()]
+    ys = [l for l in y_c_v_var.values()]
     _, fig = scatter_plot(x, ys, x_label=x_label, y_label="Coherence Score (c_v)",
                           color_legends=["K-Means", "Agglomerative", "Spectral"], type='c_v')
     fig.savefig("visuals/c_v_w2v_vs_" + str(file_save_under) + ".pdf", bbox_inches='tight', transparent=True)
 
     # u_mass coherence score
-    ys = [l for l in y_u_mass_negative.values()]
-    _, fig = scatter_plot(x, ys, x_label=x_label, y_label="Coherence Score (u_mass)",
-                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='u_mass')
-    fig.savefig("visuals/u_mass_w2v_vs_" + str(file_save_under) + ".pdf", bbox_inches='tight', transparent=True)
+    ys = [l for l in y_u_mass_var.values()]
+    _, fig = scatter_plot(x, ys, x_label=x_label, y_label="NPMI",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='c_npmi')
+    fig.savefig("visuals/npmi_w2v_vs_" + str(file_save_under) + ".pdf", bbox_inches='tight', transparent=True)
 
     # dbs score
-    ys = [l for l in y_dbs_negative.values()]
+    ys = [l for l in y_dbs_var.values()]
     _, fig = scatter_plot(x, ys, x_label=x_label, y_label="Davies–Bouldin index",
                           color_legends=["K-Means", "Agglomerative", "Spectral"], type='dbs')
     fig.savefig("visuals/dbi_w2v_vs_" + str(file_save_under) + ".pdf", bbox_inches='tight', transparent=True)
@@ -401,13 +420,15 @@ def w2v_ablation(all_data_processed: list, vocab: list, x: list = None):
         g, plt = create_circle_tree(topics)
         fig = plt.gcf()
         fig.savefig("visuals/best_" + str(m) + "_" + str(file_save_under) + ".pdf", dpi=100, transparent=True)
-        nx.write_graphml(g, "visuals/best_" + str(m) + "_" + str(file_save_under) +  ".graphml")
+        nx.write_graphml(g, "visuals/best_" + str(m) + "_" + str(file_save_under) + ".graphml")
 
         # add to best_c_v_topics_lengths
         best_c_v_topics_lengths[m] = [len(t) for t in topics]
 
         # write topics
-        write_topics(topics, "visuals/best_" + str(m) + "_" + str(file_save_under) + ".txt")
+        write_topics_ablation(topics, best_var[m], "visuals/best_" + str(m) + "_" + str(file_save_under) + ".txt")
+        write_topics_ablation(topics, worst_var[m],
+                              "visuals/worst_" + str(m) + "_" + str(file_save_under) + ".txt")
 
     best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
     _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "Spectral"], "Clustering Methods",
@@ -416,7 +437,8 @@ def w2v_ablation(all_data_processed: list, vocab: list, x: list = None):
 
 
 if __name__ == "__main__":
-    all_data_processed, vocab, tokenized_docs = preprocessing(all_data, do_stemming=False, do_lemmatizing=True, remove_low_freq=False)
+    all_data_processed, vocab, tokenized_docs = preprocessing(all_data, do_stemming=True,
+                                                              do_lemmatizing=False, remove_low_freq=True)
     #
     # get_baseline_vis(all_data_processed, vocab)
     # vis_most_common_words(all_data_processed)
@@ -425,5 +447,5 @@ if __name__ == "__main__":
     # new_vocab, vocab_embeddings = get_fast_text_embeddings(vocab)
 
     w2v_visualization(all_data_processed, vocab, tokenized_docs)
-    # w2v_ablation(all_data_processed, vocab)
+    # w2v_ablation(all_data_processed, vocab, tokenized_docs)
 

@@ -279,12 +279,34 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     return plt, fig
 
 
-def write_topics(topics: list, filename: str, n_words: int = 10):
+def write_topics_viz(topics: list, score: float, label: str, filename: str, n_words: int = 10):
     if any([len(t) > n_words for t in topics]):
         new_topics = [t[:10] for t in topics]
         topics = new_topics
 
     with open(filename, "w") as myFile:
+
+        myFile.write(label + ": " + str(score) + '\n')
+        myFile.write('\n\n\n')
+
+        for i, t in enumerate(topics):
+            myFile.write('Topic ' + str(i+1) + '\n')
+
+            for w in t:
+                myFile.write(w + ' ')
+
+            myFile.write('\n\n\n')
+
+
+def write_topics_ablation(topics: list, score: float, filename: str, n_words: int = 10):
+    if any([len(t) > n_words for t in topics]):
+        new_topics = [t[:10] for t in topics]
+        topics = new_topics
+
+    with open(filename, "w") as myFile:
+
+        myFile.write('Coherence Score: ' + str(score))
+        myFile.write('\n')
 
         for i, t in enumerate(topics):
             myFile.write('Topic ' + str(i+1) + '\n')
