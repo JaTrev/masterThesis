@@ -11,7 +11,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from collections import Counter
-
+import pickle
 import networkx as nx
 
 data, test_data = get_data()
@@ -206,7 +206,7 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
         x = list(range(2, 22, 2))
 
     else:
-        assert(x, list)
+        assert isinstance(x, list)
 
     _, _, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
     print("min_count: " + str(w2v_model.min_count))
@@ -215,8 +215,8 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
     print("ns_exponent: " + str(w2v_model.ns_exponent))
     w2v_params = {'min_c': w2v_model.min_count, 'win': w2v_model.window, 'negative': w2v_model.negative,
                   'ns_exponent': w2v_model.ns_exponent, 'seed': 42}
-    words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
-    # words, word_embeddings = get_glove_embeddings(vocab)
+    # words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+    words, word_embeddings = get_glove_embeddings(vocab)
     # words, word_embeddings = get_fast_text_embeddings(all_data_processed, vocab)
 
     k_10_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
@@ -324,7 +324,7 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
 
 
 def w2v_ablation(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
-    x_label = "Minimum Count"
+    x_label = "Minimum Sampling"
     file_save_under = "min"
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
@@ -333,7 +333,7 @@ def w2v_ablation(all_data_processed: list, vocab: list, tokenized_docs: list, x:
         x = list(range(2, 11, 1))
 
     else:
-        assert(x, list)
+        assert isinstance(x, list)
 
     _, _, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
     # w2v_model
@@ -341,7 +341,7 @@ def w2v_ablation(all_data_processed: list, vocab: list, tokenized_docs: list, x:
     # window: 3
     # negative: 60
     # ns_exponent: 0.75
-    orig = w2v_model.window
+    orig = w2v_model.min_count
     print(orig)
 
     best_var = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
@@ -358,7 +358,7 @@ def w2v_ablation(all_data_processed: list, vocab: list, tokenized_docs: list, x:
 
         for cluster_type in ["kmeans", "agglomerative", "spectral"]:
 
-            w2v_params = {'min_c': w2v_model.min_count, 'win': k, 'negative': w2v_model.negative,
+            w2v_params = {'min_c': k, 'win': w2v_model.window, 'negative': w2v_model.negative,
                           'ns_exponent': w2v_model.ns_exponent, 'seed': 42}
             words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
 
@@ -436,9 +436,238 @@ def w2v_ablation(all_data_processed: list, vocab: list, tokenized_docs: list, x:
     fig.savefig("visuals/box_plot_w2v_" + str(file_save_under) + ".pdf", dpi=100, transparent=True)
 
 
+def fast_text_visualization(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
+    clustering_weight_type = 'tf'
+    ranking_weight_type = 'tf'
+
+    if x is None:
+        x = list(range(2, 22, 2))
+
+    else:
+        assert isinstance(x, list)
+
+    words, word_embeddings = get_fast_text_embeddings(all_data_processed, vocab)
+
+    k_10_c_v = {"kmeans": 0, "agglomerative": 0}
+    best_c_v = {"kmeans": 0, "agglomerative": 0}
+    k_10_topics = {"kmeans": None, "agglomerative": None}
+    best_c_v_topics = {"kmeans": None, "agglomerative": None}
+
+    worst_c_v = {"kmeans": 1, "agglomerative": 1}
+    worst_c_v_topics = {"kmeans": None, "agglomerative": None}
+
+    y_c_v_clustering_type = {"kmeans": [], "agglomerative": []}
+    y_dbs_clustering_type = {"kmeans": [], "agglomerative": []}
+    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": []}
+
+    for k in x:
+
+        for cluster_type in ["kmeans", "agglomerative"]:
+
+            if cluster_type == "kmeans":
+                clustering_params = {'n_clusters': k, 'random_state': 42, }
+            else:
+                clustering_params = {'n_clusters': k}
+
+            clusters_words, clusters_words_embeddings = word_clusters(
+                all_data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
+                params=clustering_params, clustering_weight_type=clustering_weight_type,
+                ranking_weight_type=ranking_weight_type
+            )
+
+            cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
+            dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
+            cs_npmi = average_npmi_topics(all_data_processed, clusters_words, len(clusters_words))
+
+            y_c_v_clustering_type[cluster_type].append(cs_c_v)
+            y_u_mass_clustering_type[cluster_type].append(cs_npmi)
+            y_dbs_clustering_type[cluster_type].append(dbs)
+
+            if cs_c_v > best_c_v[cluster_type]:
+                best_c_v[cluster_type] = cs_c_v
+                best_c_v_topics[cluster_type] = clusters_words
+
+            if cs_c_v < worst_c_v[cluster_type]:
+                worst_c_v[cluster_type] = cs_c_v
+                worst_c_v_topics[cluster_type] = clusters_words
+
+            if k == 10:
+                k_10_c_v[cluster_type] = cs_c_v
+                k_10_topics[cluster_type] = clusters_words
+
+    print("best c_v scores:")
+    for m, b_cs in best_c_v.items():
+        print(str(m) + ": " + str(b_cs))
+
+    print()
+    print("k=10 c_v scores:")
+    for m, cs_score in k_10_c_v.items():
+        print(str(m) + ": " + str(cs_score))
+
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=["K-Means", "Agglomerative"], type='c_v')
+    fig.savefig("visuals/c_v_fastText_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="NPMI",
+                          color_legends=["K-Means", "Agglomerative"], type='c_npmi')
+    fig.savefig("visuals/c_npmi_fastText_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
+                          color_legends=["K-Means", "Agglomerative"], type='dbs')
+    fig.savefig("visuals/dbi_fastText_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
+
+        # k = 10 model
+        g, plt = create_circle_tree(k_10_topics[m])
+        nx.write_graphml(g, "visuals/k=10_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics_viz(topics, best_c_v[m], m,
+                         "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], m,
+                         "visuals/worst_" + str(m) + ".txt")
+        # write k = 10 model
+        write_topics_viz(k_10_topics[m], k_10_c_v[m], m,
+                         "visuals/k=10_" + str(m) + ".txt")
+
+    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
+    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative"], "Clustering Types", "Topic Lengths")
+    fig.savefig("visuals/box_plot_fastText.pdf", dpi=100, transparent=True)
+
+
+def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: list,
+                       vocab_embeddings: list, x: list = None):
+    clustering_weight_type = 'tf'
+    ranking_weight_type = 'tf'
+
+    if x is None:
+        x = list(range(2, 22, 2))
+
+    else:
+        assert isinstance(x, list)
+
+    words, word_embeddings = (vocab, vocab_embeddings)
+
+    k_10_c_v = {"kmeans": 0, "agglomerative": 0}
+    best_c_v = {"kmeans": 0, "agglomerative": 0}
+    k_10_topics = {"kmeans": None, "agglomerative": None}
+    best_c_v_topics = {"kmeans": None, "agglomerative": None}
+
+    worst_c_v = {"kmeans": 1, "agglomerative": 1}
+    worst_c_v_topics = {"kmeans": None, "agglomerative": None}
+
+    y_c_v_clustering_type = {"kmeans": [], "agglomerative": []}
+    y_dbs_clustering_type = {"kmeans": [], "agglomerative": []}
+    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": []}
+
+    for k in x:
+
+        for cluster_type in ["kmeans", "agglomerative"]:
+
+            if cluster_type == "kmeans":
+                clustering_params = {'n_clusters': k, 'random_state': 42, }
+            else:
+                clustering_params = {'n_clusters': k}
+
+            clusters_words, clusters_words_embeddings = word_clusters(
+                all_data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
+                params=clustering_params, clustering_weight_type=clustering_weight_type,
+                ranking_weight_type=ranking_weight_type
+            )
+
+            cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
+            dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
+            cs_npmi = average_npmi_topics(all_data_processed, clusters_words, len(clusters_words))
+
+            y_c_v_clustering_type[cluster_type].append(cs_c_v)
+            y_u_mass_clustering_type[cluster_type].append(cs_npmi)
+            y_dbs_clustering_type[cluster_type].append(dbs)
+
+            if cs_c_v > best_c_v[cluster_type]:
+                best_c_v[cluster_type] = cs_c_v
+                best_c_v_topics[cluster_type] = clusters_words
+
+            if cs_c_v < worst_c_v[cluster_type]:
+                worst_c_v[cluster_type] = cs_c_v
+                worst_c_v_topics[cluster_type] = clusters_words
+
+            if k == 10:
+                k_10_c_v[cluster_type] = cs_c_v
+                k_10_topics[cluster_type] = clusters_words
+
+    print("best c_v scores:")
+    for m, b_cs in best_c_v.items():
+        print(str(m) + ": " + str(b_cs))
+
+    print()
+    print("k=10 c_v scores:")
+    for m, cs_score in k_10_c_v.items():
+        print(str(m) + ": " + str(cs_score))
+
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=["K-Means", "Agglomerative"], type='c_v')
+    fig.savefig("visuals/c_v_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="NPMI",
+                          color_legends=["K-Means", "Agglomerative"], type='c_npmi')
+    fig.savefig("visuals/c_npmi_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
+                          color_legends=["K-Means", "Agglomerative"], type='dbs')
+    fig.savefig("visuals/dbi_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
+
+        # k = 10 model
+        g, plt = create_circle_tree(k_10_topics[m])
+        nx.write_graphml(g, "visuals/k=10_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics_viz(topics, best_c_v[m], m,
+                         "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], m,
+                         "visuals/worst_" + str(m) + ".txt")
+        # write k = 10 model
+        write_topics_viz(k_10_topics[m], k_10_c_v[m], m,
+                         "visuals/k=10_" + str(m) + ".txt")
+
+    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
+    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative"], "Clustering Types", "Topic Lengths")
+    fig.savefig("visuals/box_plot_bert.pdf", dpi=100, transparent=True)
+
+
 if __name__ == "__main__":
-    all_data_processed, vocab, tokenized_docs = preprocessing(all_data, do_stemming=True,
-                                                              do_lemmatizing=False, remove_low_freq=True)
+    all_data_processed, vocab, tokenized_docs = preprocessing(all_data, do_stemming=False,
+                                                              do_lemmatizing=True, remove_low_freq=False)
     #
     # get_baseline_vis(all_data_processed, vocab)
     # vis_most_common_words(all_data_processed)
@@ -446,6 +675,30 @@ if __name__ == "__main__":
 
     # new_vocab, vocab_embeddings = get_fast_text_embeddings(vocab)
 
-    w2v_visualization(all_data_processed, vocab, tokenized_docs)
+    # w2v_visualization(all_data_processed, vocab, tokenized_docs)
     # w2v_ablation(all_data_processed, vocab, tokenized_docs)
 
+    # fast_text_visualization(all_data_processed, vocab, tokenized_docs)
+
+    with open("data/all_vocab_emb_dict_snd_last.pickle", "rb") as f:
+        all_vocab_emb_dict = pickle.load(f)
+
+    all_vocab_emb_dict_words = all_vocab_emb_dict.keys()
+    vocab_bert_embeddings = []
+    new_vocab = []
+    for word in vocab:
+
+        if word in all_vocab_emb_dict_words:
+
+            w_embeddings = all_vocab_emb_dict[word]
+
+            if len(w_embeddings) >= 100:
+                new_vocab.append(word)
+                vocab_bert_embeddings.append(np.average(w_embeddings, axis=0))
+            else:
+                continue
+    assert all(len(embd) == 768 for embd in vocab_bert_embeddings)
+
+    print("old vocab len: " + str(len(vocab)))
+    print("new vocab len: " + str(len(new_vocab)))
+    bert_visualization(all_data_processed, new_vocab, tokenized_docs, vocab_bert_embeddings)

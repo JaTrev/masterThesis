@@ -143,7 +143,7 @@ def get_glove_embeddings(vocab: list, filename=None, save_embeddings=False):
     return new_vocab, vocab_embeddings
 
 
-def get_fast_text_embeddings(processed_data: list, vocab: list, min_c: int = 5, win: int = 5, negative: int = 5,
+def get_fast_text_embeddings(processed_data: list, vocab: list, min_c: int = 50, win: int = 5, negative: int = 60,
                              sample: float = 6e-5, alpha: float = 0.03,
                              min_alpha: float = 0.0007, epochs: int = 30, size: int = 300):
 
