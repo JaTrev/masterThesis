@@ -2,7 +2,7 @@ import networkx as nx
 import numpy as np
 import heapq
 from sklearn.metrics.pairwise import cosine_similarity
-import stellargraph as sg
+from stellargraph import StellarGraph
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from math import sqrt
@@ -16,6 +16,7 @@ from stellargraph.layer import GraphSAGE, link_classification, AttentionalAggreg
 from tensorflow import keras
 from stellargraph.mapper import GraphSAGENodeGenerator
 from math import sqrt
+from src.misc import *
 
 
 plt.rcParams['figure.figsize'] = [16, 9]
@@ -44,7 +45,7 @@ def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, re
     return graph
 
 
-def create_networkx_graph(words: list, word_embeddings: list, similarity_threshold: int = 0.4,
+def create_networkx_graph(words: list, word_embeddings: list, similarity_threshold: float = 0.4,
                           percentile_cutoff: int = 80, remove_isolated_nodes: bool = True) -> nx.Graph:
     """
     create_networdx_graph creates a graph given the words and their embeddings
@@ -93,7 +94,7 @@ def create_graph_with_features(graph: nx.Graph, node_list: list, feature_list: l
     return feature_graph
 
 
-def networkx_to_stellargraph(feature_graph: nx.Graph, feature_name: str = "feature") -> sg.StellarGraph:
+def networkx_to_stellargraph(feature_graph: nx.Graph, feature_name: str = "feature") -> StellarGraph:
     """
     networkx_to_stellargraph transforms a networkx graph to a stellargraph
 
@@ -101,30 +102,28 @@ def networkx_to_stellargraph(feature_graph: nx.Graph, feature_name: str = "featu
     :param feature_name: name of the node feature in this graph
     :return: stellargraph
     """
-    return sg.from_networkx(feature_graph, node_features=feature_name)
+    return StellarGraph.from_networkx(feature_graph, node_features=feature_name)
 
 
-def sort_words_by(graph: nx.Graph, word: str, word_counter: Counter):
+def sort_words_by(graph: nx.Graph, word: str, word_weights: dict):
 
-    word_weights = []
+    neighbor_weights = []
     for w_neighbor in graph.adj[word]:
-        word_weights.append(float(graph.adj[word][w_neighbor]['weight']))
+        neighbor_weights.append(float(graph.adj[word][w_neighbor]['weight']))
 
-    sim_score = np.average(word_weights)
+    sim_score = np.average(neighbor_weights)
     w_degree = graph.degree(word)
-    w_tf = word_counter.get(word)
+    w_weight = word_weights[word]
 
-    return w_degree, sim_score, w_tf
+    return w_degree, sim_score, w_weight
 
 
-def graph_evaluation_visualisation(graph: nx.Graph, processed_data: list, k_component: int = 1,
-                                   min_topic_number: int = 5) -> (list, plt):
-    temp_list = []
-    for l in processed_data:
-        temp_list.extend(l)
-    word_counter = Counter(temp_list)
-
-    components_1 = nx.k_components(graph)[k_component]
+def graph_evaluation_visualisation(graph: nx.Graph, processed_data: list, vocab: list, word_rank_type: str = "tf",
+                                   k_component: int = 1, min_topic_number: int = 6) -> (list, plt):
+    try:
+        components_1 = nx.k_components(graph)[k_component]
+    except KeyError:
+        return [["xx"]], None
 
     corpus_clusters = []
     for comp in components_1:
@@ -132,8 +131,10 @@ def graph_evaluation_visualisation(graph: nx.Graph, processed_data: list, k_comp
             corpus_clusters.append(comp)
 
     cluster_words = []
+    n_words = len([w for d in processed_data for w in d])
+    word_weights = get_word_weights(processed_data, vocab, n_words, weight_type=word_rank_type)
     for i_c, c in enumerate(corpus_clusters):
-        cluster_words.append(sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_counter)), reverse=True))
+        cluster_words.append(sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_weights)), reverse=True))
 
     cluster_assignment = []
     for n in graph.nodes:
@@ -169,14 +170,13 @@ def graph_evaluation_visualisation(graph: nx.Graph, processed_data: list, k_comp
         pos[p][1] -= 0.05
     nx.draw_networkx_labels(graph, pos, font_size=15, font_color='k')
 
-    plt.show()
     return cluster_words, plt
 
 
-def graph_sage_embeddings(sg_graph: sg.StellarGraph, aggregator: stellargraph.layer = AttentionalAggregator,
+def graph_sage_embeddings(sg_graph: StellarGraph, aggregator: stellargraph.layer = AttentionalAggregator,
                           batch_size: int = 50, number_of_walks: int = 5, length: int = 3, epochs: int = 10,
-                          num_samples=(10, 5), optimizer: keras.optimizers = keras.optimizers.Adam(),
-                          dropout: float = 0.0, layer_sizes=(50, 50), seed: int = 42) -> (list, list):
+                          num_samples=[10, 5], optimizer: keras.optimizers = keras.optimizers.Adam(),
+                          dropout: float = 0.0, layer_sizes=[50, 50], seed: int = 42) -> (list, list):
 
     nodes = list(sg_graph.nodes())
 

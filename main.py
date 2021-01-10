@@ -6,6 +6,7 @@ from src.clustering import *
 from src.vectorization import *
 from src.visualizations import *
 from src.bert import *
+from src.graphs import *
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -550,8 +551,33 @@ def fast_text_visualization(all_data_processed: list, vocab: list, tokenized_doc
     fig.savefig("visuals/box_plot_fastText.pdf", dpi=100, transparent=True)
 
 
-def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: list,
-                       vocab_embeddings: list, x: list = None):
+def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
+
+    with open("data/all_vocab_emb_dict_11.pickle", "rb") as f:
+        all_vocab_emb_dict = pickle.load(f)
+
+    all_vocab_emb_dict_words = all_vocab_emb_dict.keys()
+    vocab_bert_embeddings = []
+    new_vocab = []
+    for word in vocab:
+
+        if word in all_vocab_emb_dict_words:
+
+            w_embeddings = all_vocab_emb_dict[word]
+
+            if len(w_embeddings) >= 100:
+                new_vocab.append(word)
+                vocab_bert_embeddings.append(np.average(w_embeddings, axis=0))
+            else:
+                continue
+    assert all(len(embd) == 768 for embd in vocab_bert_embeddings)
+
+    print("old vocab len: " + str(len(vocab)))
+    print("new vocab len: " + str(len(new_vocab)))
+
+    vocab = new_vocab
+    vocab_embeddings = vocab_bert_embeddings
+
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
 
@@ -592,7 +618,8 @@ def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: li
 
             cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
             dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
-            cs_npmi = average_npmi_topics(all_data_processed, clusters_words, len(clusters_words))
+            cs_npmi = float("{:.2f}".format(average_npmi_topics(all_data_processed,
+                                                                clusters_words, len(clusters_words))))
 
             y_c_v_clustering_type[cluster_type].append(cs_c_v)
             y_u_mass_clustering_type[cluster_type].append(cs_npmi)
@@ -665,6 +692,229 @@ def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: li
     fig.savefig("visuals/box_plot_bert.pdf", dpi=100, transparent=True)
 
 
+def graph_k_components(original_data, all_data_processed, tokenized_docs):
+
+    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
+
+    best_c_v = {1: 0, 2: 0, 3: 0}
+    best_c_v_topics = {1: None, 2: None, 3: None}
+
+    worst_c_v = {1: 1, 2: 1, 3: 1}
+    worst_c_v_topics = {1: None, 2: None, 3: None}
+
+    y_c_v_clustering_type = {1: [], 2: [], 3: []}
+    y_dbs_clustering_type = {1: [], 2: [], 3: []}
+    y_u_mass_clustering_type = {1: [], 2: [], 3: []}
+
+    x = [x/100 for x in range(40, 90, 10)]
+
+    for sim in x:
+
+        for k_component in [1, 2, 3]:
+
+            graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+
+            cluster_words, _ = graph_evaluation_visualisation(
+                graph,all_data_processed, vocab_words, k_component=k_component, word_rank_type="tf")
+
+            if len(cluster_words) <= 2:
+                cs_c_v = 0.0
+                dbs = -1.0
+                cs_npmi = 0.0
+            else:
+
+                cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
+                                  for words in cluster_words]
+
+                cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, cluster_words, cs_type='c_v')))
+                dbs = float("{:.2f}".format(davies_bouldin_index(cluster_embeddings)))
+                cs_npmi = float("{:.2f}".format(average_npmi_topics(all_data_processed, cluster_words,
+                                                                    len(cluster_words))))
+
+            y_c_v_clustering_type[k_component].append(cs_c_v)
+            y_u_mass_clustering_type[k_component].append(cs_npmi)
+            y_dbs_clustering_type[k_component].append(dbs)
+
+            if cs_c_v > best_c_v[k_component]:
+                best_c_v[k_component] = cs_c_v
+                best_c_v_topics[k_component] = cluster_words
+
+            if cs_c_v < worst_c_v[k_component] and cs_c_v != 0.0:
+                worst_c_v[k_component] = cs_c_v
+                worst_c_v_topics[k_component] = cluster_words
+
+    print("best c_v scores:")
+    for k, b_cs in best_c_v.items():
+        print(str(k) + ": " + str(b_cs))
+
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
+    fig.savefig("visuals/c_v_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="NPMI",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
+    fig.savefig("visuals/c_npmi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
+                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
+    fig.savefig("visuals/dbi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    best_c_v_topics_lengths = {1: None, 2: None, 3: None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics_viz(topics, best_c_v[m], str(m),
+                         "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], str(m),
+                         "visuals/worst_" + str(m) + ".txt")
+
+    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
+    _, fig = box_plot(best_topics_lengths, ["K=1", "K=2", "K=3"], "k-Components", "Topic Lengths")
+    fig.savefig("visuals/box_plot_graph.pdf", dpi=100, transparent=True)
+
+
+def sage_graph_k_components(original_data, all_data_processed, tokenized_docs):
+    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
+
+    best_c_v = {1: 0, 2: 0, 3: 0}
+    best_c_v_topics = {1: None, 2: None, 3: None}
+
+    worst_c_v = {1: 1, 2: 1, 3: 1}
+    worst_c_v_topics = {1: None, 2: None, 3: None}
+
+    y_c_v_clustering_type = {1: [], 2: [], 3: []}
+    y_dbs_clustering_type = {1: [], 2: [], 3: []}
+    y_u_mass_clustering_type = {1: [], 2: [], 3: []}
+
+    x = [0.4, 0.5]
+
+    for sim in x:
+
+        for k_component in [1, 2, 3]:
+
+            graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+
+            cluster_words, _ = graph_evaluation_visualisation(graph, all_data_processed, vocab_words,
+                                                              k_component=k_component,
+                                                              word_rank_type="tf")
+
+            if len(cluster_words) <= 2:
+                cs_c_v = 0.0
+                dbs = -1.0
+                cs_npmi = 0.0
+
+            else:
+
+                node_sentence_embeddings, node_doc_embeddings = get_avg_sentence_doc_embeddings_w2v(original_data,
+                                                                                                    list(graph.nodes()),
+                                                                                                    vocab_words,
+                                                                                                    vocab_embeddings)
+                node_features = []
+                for node in graph.nodes():
+                    embedding = w2v_model.wv.vectors[w2v_model.wv.index2word.index(node)]
+                    sentence_embedding = node_sentence_embeddings[node]
+                    doc_embedding = node_doc_embeddings[node]
+
+                    node_feature = embedding.tolist()
+                    node_feature.extend(sentence_embedding)
+                    node_feature.extend(doc_embedding)
+
+                    node_features.append(node_feature)
+
+                feature_graph = create_graph_with_features(graph, list(graph.nodes()), node_features)
+
+                sg_graph = networkx_to_stellargraph(feature_graph)
+
+                sg_words, sg_embeddings = graph_sage_embeddings(sg_graph)
+
+                graph_revised = create_networkx_graph(sg_words, sg_embeddings, similarity_threshold=sim)
+
+                cluster_words, _ = graph_evaluation_visualisation(graph=graph_revised, processed_data=all_data_processed,
+                                                                  vocab=sg_words, k_component=k_component,
+                                                                  word_rank_type="tf")
+
+                if len(cluster_words) <= 2:
+                    cs_c_v = 0.0
+                    dbs = -1.0
+                    cs_npmi = 0.0
+                else:
+
+                    cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
+                                          for words in cluster_words]
+
+                    cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, cluster_words, cs_type='c_v')))
+                    dbs = float("{:.2f}".format(davies_bouldin_index(cluster_embeddings)))
+                    cs_npmi = float("{:.2f}".format(average_npmi_topics(all_data_processed, cluster_words,
+                                                                        len(cluster_words))))
+
+            y_c_v_clustering_type[k_component].append(cs_c_v)
+            y_u_mass_clustering_type[k_component].append(cs_npmi)
+            y_dbs_clustering_type[k_component].append(dbs)
+
+            if cs_c_v > best_c_v[k_component]:
+                best_c_v[k_component] = cs_c_v
+                best_c_v_topics[k_component] = cluster_words
+
+            if cs_c_v < worst_c_v[k_component] and cs_c_v != 0.0:
+                worst_c_v[k_component] = cs_c_v
+                worst_c_v_topics[k_component] = cluster_words
+
+    print("best c_v scores:")
+    for k, b_cs in best_c_v.items():
+        print(str(k) + ": " + str(b_cs))
+
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
+    fig.savefig("visuals/c_v_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="NPMI",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
+    fig.savefig("visuals/c_npmi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
+                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
+    fig.savefig("visuals/dbi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    best_c_v_topics_lengths = {1: None, 2: None, 3: None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics_viz(topics, best_c_v[m], str(m),
+                         "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], str(m),
+                         "visuals/worst_" + str(m) + ".txt")
+
+    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
+    _, fig = box_plot(best_topics_lengths, ["K=1", "K=2", "K=3"], "k-Components", "Topic Lengths")
+    fig.savefig("visuals/box_plot_graph.pdf", dpi=100, transparent=True)
+
+
 if __name__ == "__main__":
     all_data_processed, vocab, tokenized_docs = preprocessing(all_data, do_stemming=False,
                                                               do_lemmatizing=True, remove_low_freq=False)
@@ -680,25 +930,8 @@ if __name__ == "__main__":
 
     # fast_text_visualization(all_data_processed, vocab, tokenized_docs)
 
-    with open("data/all_vocab_emb_dict_snd_last.pickle", "rb") as f:
-        all_vocab_emb_dict = pickle.load(f)
+    # bert_visualization(all_data_processed, tokenized_docs,)
 
-    all_vocab_emb_dict_words = all_vocab_emb_dict.keys()
-    vocab_bert_embeddings = []
-    new_vocab = []
-    for word in vocab:
+    # graph_k_components(all_data, all_data_processed, tokenized_docs)
 
-        if word in all_vocab_emb_dict_words:
-
-            w_embeddings = all_vocab_emb_dict[word]
-
-            if len(w_embeddings) >= 100:
-                new_vocab.append(word)
-                vocab_bert_embeddings.append(np.average(w_embeddings, axis=0))
-            else:
-                continue
-    assert all(len(embd) == 768 for embd in vocab_bert_embeddings)
-
-    print("old vocab len: " + str(len(vocab)))
-    print("new vocab len: " + str(len(new_vocab)))
-    bert_visualization(all_data_processed, new_vocab, tokenized_docs, vocab_bert_embeddings)
+    sage_graph_k_components(all_data, all_data_processed, tokenized_docs)

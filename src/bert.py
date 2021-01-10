@@ -282,8 +282,8 @@ def train_bert(input_ids, attention_masks, lm_labels,
 
 
 def calculate_bert_embeddings(model: BertForMaskedLM, data_loader: DataLoader = None,
-                              input_ids = None, attention_masks = None, lm_labels = None,
-                              bert_layer: int = -1, batch_size: int = 16):
+                              input_ids=None, attention_masks = None, lm_labels = None,
+                              bert_layer: int = -1, batch_size: int = 16, get_cls_token=False):
 
     assert data_loader is not None or (input_ids is not None and attention_masks is not None and lm_labels is not None)
 
@@ -312,15 +312,17 @@ def calculate_bert_embeddings(model: BertForMaskedLM, data_loader: DataLoader = 
         # loss = output[0]
         # logit = output[1]
         # hidden_states = output[2], shape: [#batch, 256, 768]
-        embeddings.extend([b for b in output[2][bert_layer]])
+        if get_cls_token:
+            embeddings.extend([b for b in output[-2:][1][bert_layer][0]])
+        else:
+            embeddings.extend([b for b in output[2][bert_layer]])
 
     print("Done calculating embeddings.")
     return embeddings
 
 
 def calculate_bert_vocab_embeddings(input_ids: list, embeddings: list, vocab: list, vocab_emb_dict: dict,
-                                    tokenizer: transformers.BartTokenizer,
-                                    vocab_weights_cutoff: int = 60):
+                                    tokenizer: transformers.BartTokenizer, get_cls_token:bool = False):
     assert len(embeddings) == len(input_ids), "embeddings and input_ids are not the same size"
 
     # go through every sentence
@@ -341,11 +343,19 @@ def calculate_bert_vocab_embeddings(input_ids: list, embeddings: list, vocab: li
 
             # check if word is in the vocabulary
             word = tokenizer.ids_to_tokens[w_id]
-            w_embedding_list = [embeddings[sent_index][i].cpu().detach().numpy()]
+
+            if get_cls_token:
+                w_embedding_list = [embeddings[sent_index].cpu().detach().numpy()]
+            else:
+                w_embedding_list = [embeddings[sent_index][i].cpu().detach().numpy()]
             # get all subwords
             while i < 255 and tokenizer.ids_to_tokens[sent_ids[i + 1].item()][:2] == "##":
                 word = word + tokenizer.ids_to_tokens[sent_ids[i + 1].item()][2:]
-                w_embedding_list.append(embeddings[sent_index][i+1].cpu().detach().numpy())
+
+                if get_cls_token:
+                    w_embedding_list.append(embeddings[sent_index].cpu().detach().numpy())
+                else:
+                    w_embedding_list.append(embeddings[sent_index][i+1].cpu().detach().numpy())
                 i += 1
 
             if word in vocab:
