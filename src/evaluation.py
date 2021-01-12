@@ -21,7 +21,7 @@ def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v
     assert len(topic_words) >= 1, "need at least 1 topic"
 
     if len(topic_words) == 1:
-        return 0
+        return -1000
 
     dictionary = corpora.Dictionary(processed_data)
     # corpus = [dictionary.doc2bow(text) for text in processed_data]
@@ -50,7 +50,7 @@ def average_npmi_topics(documents, topic_words_large, ntopics,):
     """
 
     if ntopics == 1:
-        return 0
+        return -1000
 
     eps = 10**(-12)
     n_docs = len(documents)
@@ -130,7 +130,7 @@ def davies_bouldin_index(topic_word_embeddings: list) -> float:
     """
 
     if len(topic_word_embeddings) == 1:
-        return -1
+        return -1000
 
     temp_topic_words_embeddings = []
     temp_labels = []

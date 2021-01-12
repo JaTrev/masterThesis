@@ -17,6 +17,7 @@ from tensorflow import keras
 from stellargraph.mapper import GraphSAGENodeGenerator
 from math import sqrt
 from src.misc import *
+import heapq
 
 
 plt.rcParams['figure.figsize'] = [16, 9]
@@ -25,6 +26,7 @@ plt.rcParams['figure.figsize'] = [16, 9]
 def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, remove_isolated_nodes):
     # remove edges that do not have a high enough similarity score
     min_cutoff_value = np.percentile(edge_weights, percentile_cutoff)
+    # min(heapq.nlargest(percentile_cutoff, edge_weights))
 
     edges_to_kill = []
     for n, nbrs in graph.adj.items():
@@ -136,40 +138,6 @@ def graph_evaluation_visualisation(graph: nx.Graph, processed_data: list, vocab:
     for i_c, c in enumerate(corpus_clusters):
         cluster_words.append(sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_weights)), reverse=True))
 
-    cluster_assignment = []
-    for n in graph.nodes:
-
-        found_cluster = False
-        for i_c, c in enumerate(cluster_words):
-
-            if n in c and not found_cluster:
-                cluster_assignment.append(i_c + 1)
-                found_cluster = True
-
-        if not found_cluster:
-            cluster_assignment.append(0)
-
-    assert len(cluster_assignment) == len(graph.nodes)
-
-    norm = mpl.colors.Normalize(vmin=0, vmax=len(cluster_words) + 1, clip=True)
-    mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
-
-    count = graph.number_of_nodes()
-    k = 10 / sqrt(count)
-    pos = nx.fruchterman_reingold_layout(graph, k=k, iterations=300)
-
-    nx.draw(graph, pos,
-            nodelist=graph.nodes,
-            font_size=15,
-            node_size=40,
-            edge_color='gray',
-            node_color=[mapper.to_rgba(c_i) for c_i in cluster_assignment],
-            with_labels=False)
-
-    for p in pos:  # raise positions of the labels, relative to the nodes
-        pos[p][1] -= 0.05
-    nx.draw_networkx_labels(graph, pos, font_size=15, font_color='k')
-
     return cluster_words, plt
 
 
@@ -273,3 +241,40 @@ def add_doc_to_graph(graph: nx.Graph, original_nodes: list, original_node_embedd
     new_feature_graph = create_graph_with_features(new_graph, new_nodes, new_node_features)
 
     return new_feature_graph
+
+
+"""
+    cluster_assignment = []
+    for n in graph.nodes:
+
+        found_cluster = False
+        for i_c, c in enumerate(cluster_words):
+
+            if n in c and not found_cluster:
+                cluster_assignment.append(i_c + 1)
+                found_cluster = True
+
+        if not found_cluster:
+            cluster_assignment.append(0)
+
+    assert len(cluster_assignment) == len(graph.nodes)
+
+    norm = mpl.colors.Normalize(vmin=0, vmax=len(cluster_words) + 1, clip=True)
+    mapper = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.cm.gist_ncar)
+
+    count = graph.number_of_nodes()
+    k = 10 / sqrt(count)
+    pos = nx.fruchterman_reingold_layout(graph, k=k, iterations=300)
+
+    nx.draw(graph, pos,
+            nodelist=graph.nodes,
+            font_size=15,
+            node_size=40,
+            edge_color='gray',
+            node_color=[mapper.to_rgba(c_i) for c_i in cluster_assignment],
+            with_labels=False)
+
+    for p in pos:  # raise positions of the labels, relative to the nodes
+        pos[p][1] -= 0.05
+    nx.draw_networkx_labels(graph, pos, font_size=15, font_color='k')
+    """

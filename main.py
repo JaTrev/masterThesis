@@ -692,7 +692,7 @@ def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: li
     fig.savefig("visuals/box_plot_bert.pdf", dpi=100, transparent=True)
 
 
-def graph_k_components(original_data, all_data_processed, tokenized_docs):
+def graph_k_components(original_data, all_data_processed, vocab, tokenized_docs):
 
     vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
 
@@ -710,17 +710,17 @@ def graph_k_components(original_data, all_data_processed, tokenized_docs):
 
     for sim in x:
 
-        for k_component in [1, 2, 3]:
+        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
 
-            graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+        for k_component in [1, 2, 3]:
 
             cluster_words, _ = graph_evaluation_visualisation(
                 graph,all_data_processed, vocab_words, k_component=k_component, word_rank_type="tf")
 
             if len(cluster_words) <= 2:
-                cs_c_v = 0.0
-                dbs = -1.0
-                cs_npmi = 0.0
+                cs_c_v = -1000.0
+                dbs = -1000.0
+                cs_npmi = -1000.0
             else:
 
                 cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
@@ -739,7 +739,7 @@ def graph_k_components(original_data, all_data_processed, tokenized_docs):
                 best_c_v[k_component] = cs_c_v
                 best_c_v_topics[k_component] = cluster_words
 
-            if cs_c_v < worst_c_v[k_component] and cs_c_v != 0.0:
+            if cs_c_v < worst_c_v[k_component] and cs_c_v != -1000.0:
                 worst_c_v[k_component] = cs_c_v
                 worst_c_v_topics[k_component] = cluster_words
 
@@ -786,7 +786,8 @@ def graph_k_components(original_data, all_data_processed, tokenized_docs):
     fig.savefig("visuals/box_plot_graph.pdf", dpi=100, transparent=True)
 
 
-def sage_graph_k_components(original_data, all_data_processed, tokenized_docs):
+def sage_graph_k_components(original_data, all_data_processed, vocab, tokenized_docs):
+
     vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
 
     best_c_v = {1: 0, 2: 0, 3: 0}
@@ -803,18 +804,18 @@ def sage_graph_k_components(original_data, all_data_processed, tokenized_docs):
 
     for sim in x:
 
-        for k_component in [1, 2, 3]:
+        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
 
-            graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+        for k_component in [1, 2, 3]:
 
             cluster_words, _ = graph_evaluation_visualisation(graph, all_data_processed, vocab_words,
                                                               k_component=k_component,
                                                               word_rank_type="tf")
 
             if len(cluster_words) <= 2:
-                cs_c_v = 0.0
-                dbs = -1.0
-                cs_npmi = 0.0
+                cs_c_v = -1000.0
+                dbs = -1000.0
+                cs_npmi = -1000.0
 
             else:
 
@@ -847,9 +848,9 @@ def sage_graph_k_components(original_data, all_data_processed, tokenized_docs):
                                                                   word_rank_type="tf")
 
                 if len(cluster_words) <= 2:
-                    cs_c_v = 0.0
-                    dbs = -1.0
-                    cs_npmi = 0.0
+                    cs_c_v = -1000.0
+                    dbs = -1000.0
+                    cs_npmi = -1000.0
                 else:
 
                     cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
@@ -868,7 +869,7 @@ def sage_graph_k_components(original_data, all_data_processed, tokenized_docs):
                 best_c_v[k_component] = cs_c_v
                 best_c_v_topics[k_component] = cluster_words
 
-            if cs_c_v < worst_c_v[k_component] and cs_c_v != 0.0:
+            if cs_c_v < worst_c_v[k_component] and cs_c_v != -1000.0:
                 worst_c_v[k_component] = cs_c_v
                 worst_c_v_topics[k_component] = cluster_words
 
@@ -934,4 +935,4 @@ if __name__ == "__main__":
 
     # graph_k_components(all_data, all_data_processed, tokenized_docs)
 
-    sage_graph_k_components(all_data, all_data_processed, tokenized_docs)
+    sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)

@@ -250,8 +250,10 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     mapper = mpl.cm.get_cmap('Pastel2')
     ys_color = [mapper(i_y) for i_y,_ in enumerate(ys)]
 
+    error_value = -1000
     for i_y, y in enumerate(ys):
-        plt.plot(x, y, 'o-', c=ys_color[i_y], markersize=17, linewidth=3, label=color_legends[i_y])
+        new_y = [value if value != error_value else np.nan for value in y]
+        plt.plot(x, new_y, 'o-', c=ys_color[i_y], markersize=17, linewidth=3, label=color_legends[i_y])
 
     if type == "u_mass":
         y_ticks = [x for x in range(-6, 8, 2)]
@@ -263,7 +265,7 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     elif type == "dbs":
         all_y = []
         for y in ys:
-            all_y.extend((y))
+            all_y.extend(y)
         y_ticks = [x/10 for x in range(10, 40, 5)]
 
     ax.set_xlabel(x_label, fontsize='medium')
