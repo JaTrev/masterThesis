@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 import pickle
 import networkx as nx
+from karateclub import DeepWalk, GEMSEC
 
 data, test_data = get_data()
 
@@ -217,7 +218,8 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
     w2v_params = {'min_c': w2v_model.min_count, 'win': w2v_model.window, 'negative': w2v_model.negative,
                   'ns_exponent': w2v_model.ns_exponent, 'seed': 42, 'sample': w2v_model.sample}
 
-    words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+    words, word_embeddings, _ = get_doc2vec_embeddings(all_data_processed, vocab, **w2v_params)
+    # get_word_vectors(all_data_processed, vocab, params=w2v_params)
     # words, word_embeddings = get_glove_embeddings(vocab)
 
     # get word embedding similarities

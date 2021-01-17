@@ -3,6 +3,7 @@ from gensim.models.fasttext import FastText
 import gensim.downloader as api
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from tqdm import tqdm
 import numpy as np
 import os
@@ -258,6 +259,26 @@ def get_pretrained_fast_text_embeddings(vocab: list):
     print("fastText vocab has " + str(len(vocab) - len(new_vocab)) + " words less")
 
     return new_vocab, vocab_embeddings
+
+
+def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: int, negative: int, ns_exponent: float,
+                           seed: int, sample: float = 6e-5, alpha: float = 0.03, min_alpha: float = 0.0007,
+                           epochs: int = 30, size: int = 300):
+
+    documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(processed_data)]
+    d2v_model = Doc2Vec(documents, min_count=min_c, window=win, vector_size=size, sample=sample, alpha=alpha,
+                        min_alpha=min_alpha, negative=negative, ns_exponent=ns_exponent, seed=seed,
+                        compute_loss=True, workers=1, epochs=epochs, sorted_vocab=1)
+
+    # normalize vectors:
+    d2v_model.init_sims(replace=True)
+
+    # vocab_words and vocab_embeddings are sorted like vocab
+    vocab_words = [w for w in vocab if w in d2v_model.wv.index2word]
+    vocab_embeddings = [d2v_model.wv.vectors[d2v_model.wv.index2word.index(w)]
+                        for w in vocab if w in d2v_model.wv.index2word]
+
+    return vocab_words, vocab_embeddings, d2v_model
 
 
 if __name__ == "__main__":
