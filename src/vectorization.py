@@ -261,6 +261,48 @@ def get_pretrained_fast_text_embeddings(vocab: list):
     return new_vocab, vocab_embeddings
 
 
+def get_doc_embeddings(processed_data: list, vocab: list, embedding_type: str, params=None):
+
+    doc_embeddings = []
+
+    if embedding_type == "w2v_mean":
+        vocab_words, vocab_embeddings, _ = get_word_vectors(processed_data=processed_data, vocab=vocab, params=params)
+
+        doc_data = []
+        for doc in processed_data:
+            if any([w in doc for w in vocab_words]):
+                doc_data.append(doc)
+
+        for i, doc in enumerate(doc_data):
+            temp_embeddings = [vocab_embeddings[vocab_words.index(w)] for w in doc if w in vocab_words]
+
+            if len(temp_embeddings) > 1:
+                doc_embeddings.append(np.mean(temp_embeddings, axis=0))
+
+            elif len(temp_embeddings) == 1:
+                doc_embeddings.append(temp_embeddings[0])
+            else:
+                print("error")
+                print([w for w in doc if w in vocab_words])
+                print("---------")
+                continue
+
+        vocab = vocab_words
+
+    else:
+        assert embedding_type == "doc2vec"
+
+        doc_data = []
+        for doc in processed_data:
+            if any([w in doc for w in vocab]):
+                doc_data.append(doc)
+        _, _, doc_embeddings, _ = get_doc2vec_embeddings(doc_data, vocab, **params)
+
+    assert all([len(doc_embeddings[0]) == len(e) for e in doc_embeddings])
+    assert len(doc_data) == len(doc_embeddings)
+    return doc_data, doc_embeddings, vocab
+
+
 def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: int, negative: int, ns_exponent: float,
                            seed: int, sample: float = 6e-5, alpha: float = 0.03, min_alpha: float = 0.0007,
                            epochs: int = 30, size: int = 300):
@@ -278,7 +320,9 @@ def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: i
     vocab_embeddings = [d2v_model.wv.vectors[d2v_model.wv.index2word.index(w)]
                         for w in vocab if w in d2v_model.wv.index2word]
 
-    return vocab_words, vocab_embeddings, d2v_model
+    doc_embeddings = [d2v_model.docvecs[i] for i in range(len(processed_data))]
+
+    return vocab_words, vocab_embeddings, doc_embeddings, d2v_model
 
 
 if __name__ == "__main__":

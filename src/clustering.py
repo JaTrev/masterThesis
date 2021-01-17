@@ -177,7 +177,6 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
         assert clustering_type == "nmf"
         cluster_words, cluster_embeddings = nmf_clustering(word_embeddings, words, **params)
 
-
     # remove clusters with <= 5 words:
     cleaned_cluster_words = []
     cleaned_cluster_embeddings = []
@@ -195,6 +194,75 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
 
     return sort_words(processed_docs, cleaned_cluster_words,
                       cleaned_cluster_embeddings, weight_type=ranking_weight_type)
+
+
+def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
+                        clustering_type: str, params: dict,
+                        clustering_weight_type: str = 'vocab_count') -> (list, list):
+    """
+    word_clusters returns a sorted list of words for each cluster
+
+    :param doc_data: list of preprocessed documents
+    :param doc_embeddings: list of word embeddings
+    :param vocab: list of vocabulary words
+    :param clustering_type: defines the clustering method ('kmeans', 'agglomerative', 'spectral')
+    :param params: clustering parameters
+    :param clustering_weight_type: word weighting type used for clustering ("tf", "tf-df", "tf-idf")
+    :param ranking_weight_type: word weighting type used for ranking words ("tf", "tf-df", "tf-idf")
+
+    :return: list of cluster words for each cluster, list of word embeddings for each cluster (sorted!)
+    """
+
+    doc_names = [str(i) for i in range(len(doc_data))]
+
+    assert len(doc_embeddings) == len(doc_names), "doc_embeddings and word list do not have the same length"
+    assert clustering_type in ['kmeans', 'agglomerative', 'spectral', 'nmf'], "incorrect clustering_type"
+
+    clustering_dict = {
+        'kmeans': kmeans_clustering,
+        'agglomerative': agglomerative_clustering,
+        'spectral': spectral_clustering
+    }
+
+    print("Performing weighted clustering!")
+
+    doc_weights_dict = get_doc_weights(doc_data, vocab, weight_type=clustering_weight_type)
+    doc_weights = [doc_weights_dict[doc] for doc in doc_names]
+
+    if clustering_type in clustering_dict.keys():
+        # cluster words to cluster labels
+        labels = clustering_dict[clustering_type](doc_embeddings, doc_weights, params)
+
+        # assign each word to cluster list
+        cluster_docs = [[] for _ in range(len(set(labels)))]
+        cluster_embeddings = [[] for _ in range(len(cluster_docs))]
+        for l_id, label in enumerate(list(labels)):
+
+            cluster_docs[label].append(doc_data[l_id])
+            cluster_embeddings[label].append(doc_embeddings[l_id])
+
+    else:
+        assert clustering_type == "nmf"
+        print("no implemented")
+        #todo: implement NMF for document clustering
+
+    # remove clusters with <= 5 words:
+    cleaned_cluster_docs = []
+    cleaned_cluster_embeddings = []
+    for i_c, c in enumerate(cluster_docs):
+
+        if len(c) <= 5:
+            continue
+        cleaned_cluster_docs.append(c)
+        cleaned_cluster_embeddings.append(cluster_embeddings[i_c])
+
+    # if no clusters have >= 6 words
+    if len(cleaned_cluster_docs) == 0:
+        print("No clusters found!")
+        cleaned_cluster_docs.append([])
+        cleaned_cluster_embeddings.append([])
+
+    return cleaned_cluster_docs, cleaned_cluster_embeddings
 
 
 if __name__ == "__main__":

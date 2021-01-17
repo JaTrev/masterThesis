@@ -9,6 +9,20 @@ def absolute_word_counter(processed_docs: list) -> Counter:
     return Counter(temp_doc)
 
 
+def get_doc_weights(processed_docs: list, vocab: list, weight_type: str = 'vocab_count') -> dict:
+
+    doc_weight = {}
+
+    if weight_type == "vocab_count":
+
+        for i, doc in enumerate(processed_docs):
+            doc_weight.update({str(i): len([w for w in doc if w in vocab])})
+
+    assert len(doc_weight) == len(processed_docs)
+
+    return doc_weight
+
+
 def get_word_weights(processed_docs: list, vocab: list, n_words: int, weight_type: str = 'tf') -> dict:
 
     assert weight_type in ["tf", "tf-df", "tf-idf"], "weight_type not in ('tf', 'tf-df', 'tf-idf')"
