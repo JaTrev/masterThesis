@@ -215,28 +215,38 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
     print("negative: " + str(w2v_model.negative))
     print("ns_exponent: " + str(w2v_model.ns_exponent))
     w2v_params = {'min_c': w2v_model.min_count, 'win': w2v_model.window, 'negative': w2v_model.negative,
-                  'ns_exponent': w2v_model.ns_exponent, 'seed': 42}
-    # words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
-    words, word_embeddings = get_glove_embeddings(vocab)
-    # words, word_embeddings = get_fast_text_embeddings(all_data_processed, vocab)
+                  'ns_exponent': w2v_model.ns_exponent, 'seed': 42, 'sample': w2v_model.sample}
 
-    k_10_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
-    best_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
-    k_10_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
-    best_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
+    words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+    # words, word_embeddings = get_glove_embeddings(vocab)
 
-    worst_c_v = {"kmeans": 1, "agglomerative": 1, "spectral": 1}
-    worst_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
+    # get word embedding similarities
+    # word_embeddings = get_word_similarities(word_embeddings)
 
-    y_c_v_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
-    y_dbs_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
-    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
+    k_10_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0, "nmf": 0}
+    best_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0, "nmf": 0}
+    k_10_topics = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
+    best_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
+
+    worst_c_v = {"kmeans": 1, "agglomerative": 1, "spectral": 1, "nmf": 1}
+    worst_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
+
+    y_c_v_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": [], "nmf": []}
+    y_dbs_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": [], "nmf": []}
+    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": [], "nmf": []}
+
+    done_dbscan = False
 
     for k in x:
 
-        for cluster_type in ["kmeans", "agglomerative", "spectral"]:
+        for cluster_type in ["kmeans", "agglomerative", "spectral", "nmf"]:
 
-            if cluster_type == "kmeans":
+            if cluster_type == "dbscan" and done_dbscan:
+                y_c_v_clustering_type[cluster_type].append(y_c_v_clustering_type[cluster_type][0])
+                y_dbs_clustering_type[cluster_type].append(y_dbs_clustering_type[cluster_type][0])
+                y_u_mass_clustering_type[cluster_type].append(y_u_mass_clustering_type[cluster_type][0])
+
+            if cluster_type in ["kmeans", "nmf"]:
                 clustering_params = {'n_clusters': k, 'random_state': 42, }
             else:
                 clustering_params = {'n_clusters': k}
@@ -280,22 +290,22 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
     # c_v coherence score
     ys = [l for l in y_c_v_clustering_type.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='c_v')
+                          color_legends=["K-Means", "Agglomerative", "Spectral", "NMF"], type='c_v')
     fig.savefig("visuals/c_v_w2v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # u_mass coherence score
     ys = [l for l in y_u_mass_clustering_type.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="NPMI",
-                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='c_npmi')
+                          color_legends=["K-Means", "Agglomerative", "Spectral", "NMF"], type='c_npmi')
     fig.savefig("visuals/c_npmi_w2v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # dbs score
     ys = [l for l in y_dbs_clustering_type.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
-                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='dbs')
+                          color_legends=["K-Means", "Agglomerative", "Spectral", "NMF"], type='dbs')
     fig.savefig("visuals/dbi_w2v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None, "spectral": None}
+    best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
     for m, topics in best_c_v_topics.items():
         g, plt = create_circle_tree(topics)
         fig = plt.gcf()
@@ -319,7 +329,7 @@ def w2v_visualization(all_data_processed: list, vocab: list, tokenized_docs: lis
                          "visuals/k=10_" + str(m) + ".txt")
 
     best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
-    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "Spectral"], "Clustering Types",
+    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "Spectral", "NMF"], "Clustering Types",
                       "Topic Lengths")
     fig.savefig("visuals/box_plot_w2v.pdf", dpi=100, transparent=True)
 
@@ -553,7 +563,7 @@ def fast_text_visualization(all_data_processed: list, vocab: list, tokenized_doc
 
 def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
 
-    with open("data/all_vocab_emb_dict_11.pickle", "rb") as f:
+    with open("data/all_vocab_emb_dict_last_bare.pickle", "rb") as f:
         all_vocab_emb_dict = pickle.load(f)
 
     all_vocab_emb_dict_words = all_vocab_emb_dict.keys()
@@ -589,23 +599,23 @@ def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: li
 
     words, word_embeddings = (vocab, vocab_embeddings)
 
-    k_10_c_v = {"kmeans": 0, "agglomerative": 0}
-    best_c_v = {"kmeans": 0, "agglomerative": 0}
-    k_10_topics = {"kmeans": None, "agglomerative": None}
-    best_c_v_topics = {"kmeans": None, "agglomerative": None}
+    k_10_c_v = {"kmeans": 0, "agglomerative": 0, "nmf": 0}
+    best_c_v = {"kmeans": 0, "agglomerative": 0, "nmf": 0}
+    k_10_topics = {"kmeans": None, "agglomerative": None, "nmf": None}
+    best_c_v_topics = {"kmeans": None, "agglomerative": None, "nmf": None}
 
-    worst_c_v = {"kmeans": 1, "agglomerative": 1}
-    worst_c_v_topics = {"kmeans": None, "agglomerative": None}
+    worst_c_v = {"kmeans": 1, "agglomerative": 1, "nmf": 1}
+    worst_c_v_topics = {"kmeans": None, "agglomerative": None, "nmf": None}
 
-    y_c_v_clustering_type = {"kmeans": [], "agglomerative": []}
-    y_dbs_clustering_type = {"kmeans": [], "agglomerative": []}
-    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": []}
+    y_c_v_clustering_type = {"kmeans": [], "agglomerative": [], "nmf": []}
+    y_dbs_clustering_type = {"kmeans": [], "agglomerative": [], "nmf": []}
+    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": [], "nmf": []}
 
     for k in x:
 
-        for cluster_type in ["kmeans", "agglomerative"]:
+        for cluster_type in ["kmeans", "agglomerative", "nmf"]:
 
-            if cluster_type == "kmeans":
+            if cluster_type in ["kmeans", "nmf"]:
                 clustering_params = {'n_clusters': k, 'random_state': 42, }
             else:
                 clustering_params = {'n_clusters': k}
@@ -649,19 +659,19 @@ def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: li
     # c_v coherence score
     ys = [l for l in y_c_v_clustering_type.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative"], type='c_v')
+                          color_legends=["K-Means", "Agglomerative", "NMF"], type='c_v')
     fig.savefig("visuals/c_v_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # u_mass coherence score
     ys = [l for l in y_u_mass_clustering_type.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="NPMI",
-                          color_legends=["K-Means", "Agglomerative"], type='c_npmi')
+                          color_legends=["K-Means", "Agglomerative", "NMF"], type='c_npmi')
     fig.savefig("visuals/c_npmi_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # dbs score
     ys = [l for l in y_dbs_clustering_type.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
-                          color_legends=["K-Means", "Agglomerative"], type='dbs')
+                          color_legends=["K-Means", "Agglomerative", "NMF"], type='dbs')
     fig.savefig("visuals/dbi_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None}
@@ -688,7 +698,7 @@ def bert_visualization(all_data_processed: list, vocab: list, tokenized_docs: li
                          "visuals/k=10_" + str(m) + ".txt")
 
     best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
-    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative"], "Clustering Types", "Topic Lengths")
+    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "NMF"], "Clustering Types", "Topic Lengths")
     fig.savefig("visuals/box_plot_bert.pdf", dpi=100, transparent=True)
 
 
@@ -926,13 +936,13 @@ if __name__ == "__main__":
 
     # new_vocab, vocab_embeddings = get_fast_text_embeddings(vocab)
 
-    # w2v_visualization(all_data_processed, vocab, tokenized_docs)
+    w2v_visualization(all_data_processed, vocab, tokenized_docs)
     # w2v_ablation(all_data_processed, vocab, tokenized_docs)
 
     # fast_text_visualization(all_data_processed, vocab, tokenized_docs)
 
-    # bert_visualization(all_data_processed, tokenized_docs,)
+    # bert_visualization(all_data_processed, vocab, tokenized_docs)
 
     # graph_k_components(all_data, all_data_processed, tokenized_docs)
 
-    sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
+    # sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)

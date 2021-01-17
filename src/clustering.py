@@ -1,7 +1,55 @@
-from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering
+from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering, DBSCAN
 from sklearn.metrics.pairwise import cosine_similarity
 from src.misc import *
 import numpy as np
+from sklearn.decomposition import NMF
+
+
+def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_words: int = 10, random_state: int = 42,
+                    init: str = 'nndsvd', solver: str = 'cd', beta_loss: str = 'frobenius'):
+
+    """
+    nmf_clustering uses the similarity matrix based on the word_embeddings to perform NMF factorization.
+    The similarity matrix is pruned by removing small values which gives a sparser similarity space to operate in.
+
+    based on "Rethinking Topic Modelling: From Document-Space to Term-Space" by Magnus Sahlgren
+    :param word_embeddings:
+    :param words:
+    :param n_clusters:
+    :param n_words:
+    :param random_state:
+    :param init:
+    :param solver:
+    :param beta_loss:
+    :return:
+    """
+
+    assert len(word_embeddings) == len(words)
+    assert init in [None, 'random', 'nndsvd', 'nndsvda', 'nndsvdar'], "need an appropriate method to init to procedure"
+    assert solver in ['mu', 'cd'], "need an appropriate solver"
+    assert beta_loss in ['frobenius', 'kullback-leibler', 'itakura-saito'], "need an appropriate beta_loss"
+
+    embeddings_similarities = []
+    all_sim = []
+    for i_w, w_embedding in enumerate(word_embeddings):
+        w_similarities = cosine_similarity(w_embedding.reshape(1, -1),  word_embeddings)[0]
+        w_similarities = [0 if sim <= 0 or i_sim == i_w else sim for i_sim, sim in enumerate(w_similarities)]
+        all_sim.extend(w_similarities)
+        embeddings_similarities.append(w_similarities)
+
+    nmf_model = NMF(n_components=n_clusters, init=init, beta_loss=beta_loss, solver=solver,
+                    max_iter=1000, alpha=.1, l1_ratio=.5, random_state=random_state).fit(embeddings_similarities)
+
+    topics_words = []
+    topics_embeddings = []
+    for topic_idx, topic in enumerate(nmf_model.components_):
+        top_words = [words[i] for i in topic.argsort()[:-n_words - 1:-1]]
+        top_embeddings = [word_embeddings[i] for i in topic.argsort()[:-n_words - 1:-1]]
+
+        topics_words.append(top_words)
+        topics_embeddings.append(top_embeddings)
+
+    return topics_words, topics_embeddings
 
 
 def kmeans_clustering(word_embeddings: list, word_weights: list = None, params: dict = None) -> list:
@@ -17,6 +65,10 @@ def agglomerative_clustering(word_embeddings: list, word_weights: list = None, p
 def spectral_clustering(word_embeddings: list, word_weights: list = None, params: dict = None):
     model = SpectralClustering(**params)
     return model.fit_predict(word_embeddings, word_weights)
+
+
+def dbscan_cluster(word_embeddings: list, word_weights: list = None):
+    return DBSCAN(min_samples=6).fit_predict(word_embeddings, sample_weight=word_weights)
 
 
 def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: list,
@@ -84,7 +136,7 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
     # :param n_words: number of words for every cluster
 
     assert len(word_embeddings) == len(words), "word_embeddings and word list do not have the same length"
-    assert clustering_type in ['kmeans', 'agglomerative', 'spectral'], "incorrect clustering_type"
+    assert clustering_type in ['kmeans', 'agglomerative', 'spectral', 'nmf'], "incorrect clustering_type"
     assert all([w in vocab for w in words]), "some words are not in the vocabulary"
 
     clustering_dict = {
@@ -105,20 +157,26 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
         word_weights_dict = get_word_weights(processed_docs, vocab, n_words, weight_type=clustering_weight_type)
         word_weights = [word_weights_dict[w] for w in words]
 
-    # cluster words to cluster labels
-    labels = clustering_dict[clustering_type](word_embeddings, word_weights, params)
+    if clustering_type in clustering_dict.keys():
+        # cluster words to cluster labels
+        labels = clustering_dict[clustering_type](word_embeddings, word_weights, params)
 
-    # assign each word to cluster list
-    cluster_words = [[] for _ in range(len(set(labels)))]
-    cluster_embeddings = [[] for _ in range(len(cluster_words))]
-    for l_id, l in enumerate(list(labels)):
+        # assign each word to cluster list
+        cluster_words = [[] for _ in range(len(set(labels)))]
+        cluster_embeddings = [[] for _ in range(len(cluster_words))]
+        for l_id, label in enumerate(list(labels)):
 
-        w = words[l_id]
-        if w not in vocab:
-            continue
+            w = words[l_id]
+            if w not in vocab:
+                continue
 
-        cluster_words[l].append(w)
-        cluster_embeddings[l].append(word_embeddings[l_id])
+            cluster_words[label].append(w)
+            cluster_embeddings[label].append(word_embeddings[l_id])
+
+    else:
+        assert clustering_type == "nmf"
+        cluster_words, cluster_embeddings = nmf_clustering(word_embeddings, words, **params)
+
 
     # remove clusters with <= 5 words:
     cleaned_cluster_words = []
