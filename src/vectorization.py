@@ -261,7 +261,8 @@ def get_pretrained_fast_text_embeddings(vocab: list):
     return new_vocab, vocab_embeddings
 
 
-def get_doc_embeddings(processed_data: list, vocab: list, embedding_type: str, params=None):
+def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, embedding_type: str, params=None):
+    assert len(processed_data) == len(data_labels)
 
     doc_embeddings = []
 
@@ -269,9 +270,11 @@ def get_doc_embeddings(processed_data: list, vocab: list, embedding_type: str, p
         vocab_words, vocab_embeddings, _ = get_word_vectors(processed_data=processed_data, vocab=vocab, params=params)
 
         doc_data = []
-        for doc in processed_data:
+        doc_labels = []
+        for i, doc in enumerate(processed_data):
             if any([w in doc for w in vocab_words]):
                 doc_data.append(doc)
+                doc_labels.append(data_labels[i])
 
         for i, doc in enumerate(doc_data):
             temp_embeddings = [vocab_embeddings[vocab_words.index(w)] for w in doc if w in vocab_words]
@@ -293,14 +296,17 @@ def get_doc_embeddings(processed_data: list, vocab: list, embedding_type: str, p
         assert embedding_type == "doc2vec"
 
         doc_data = []
-        for doc in processed_data:
+        doc_labels = []
+        for i, doc in enumerate(processed_data):
             if any([w in doc for w in vocab]):
                 doc_data.append(doc)
+                doc_labels.append(data_labels[i])
         _, _, doc_embeddings, _ = get_doc2vec_embeddings(doc_data, vocab, **params)
 
     assert all([len(doc_embeddings[0]) == len(e) for e in doc_embeddings])
     assert len(doc_data) == len(doc_embeddings)
-    return doc_data, doc_embeddings, vocab
+    assert len(doc_data) == len(doc_labels)
+    return doc_data, doc_labels, doc_embeddings, vocab
 
 
 def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: int, negative: int, ns_exponent: float,

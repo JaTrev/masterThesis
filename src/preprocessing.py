@@ -31,7 +31,7 @@ stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'car', 'lik
 stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really"])
 
 
-def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = False,
+def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_lemmatizing: bool = False,
                   remove_low_freq: bool = False) -> (list, list, list):
     """
     Document for processing a list of documents.
@@ -46,6 +46,7 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
 
     vocabulary = []
     new_docs = []
+    new_labels = []
     tokenized_docs = []
     for i, doc in enumerate(docs):
 
@@ -80,6 +81,7 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
             continue
 
         new_docs.append(tkns)
+        new_labels.append(docs_label[i])
         vocabulary.extend(tkns)
         tokenized_docs.append(doc_tkns)
 
@@ -110,4 +112,5 @@ def preprocessing(docs: list, do_stemming: bool = False, do_lemmatizing: bool = 
         vocabulary = vocab_threshold
         tokenized_docs = tokenized_docs_threshold
 
-    return new_docs, sorted(list(set(vocabulary))), tokenized_docs
+    assert len(new_docs) == len(new_labels)
+    return new_docs, new_labels, sorted(list(set(vocabulary))), tokenized_docs

@@ -208,7 +208,6 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
     :param clustering_type: defines the clustering method ('kmeans', 'agglomerative', 'spectral')
     :param params: clustering parameters
     :param clustering_weight_type: word weighting type used for clustering ("tf", "tf-df", "tf-idf")
-    :param ranking_weight_type: word weighting type used for ranking words ("tf", "tf-df", "tf-idf")
 
     :return: list of cluster words for each cluster, list of word embeddings for each cluster (sorted!)
     """
@@ -243,8 +242,8 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
 
     else:
         assert clustering_type == "nmf"
-        print("no implemented")
-        #todo: implement NMF for document clustering
+        assert 0
+        # todo: implement NMF for document clustering
 
     # remove clusters with <= 5 words:
     cleaned_cluster_docs = []
@@ -262,13 +261,12 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
         cleaned_cluster_docs.append([])
         cleaned_cluster_embeddings.append([])
 
-    return cleaned_cluster_docs, cleaned_cluster_embeddings
+    return cleaned_cluster_docs, cleaned_cluster_embeddings, labels
 
 
 if __name__ == "__main__":
     docs = [["a", "asa", "asa"], ["a", "a", "aa"]]
 
     # calculate words frequencies per document
-    word_frequencies_per_doc = [Counter(doc) for doc in docs]
+    # word_frequencies_per_doc = [Counter(doc) for doc in docs]
 
-    # calculate document frequency
