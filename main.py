@@ -944,7 +944,11 @@ def sage_graph_k_components(original_data, all_data_processed, vocab, tokenized_
 
 
 def doc_clustering(all_data_processed: list, all_data_labels: list, vocab: list, tokenized_docs: list,
-                   doc_embedding_type = "w2v_mean", x: list = None):
+                   doc_embedding_type="w2v_mean", x: list = None):
+
+    # main extrinsic evaluation metric: ARI
+    # https://stats.stackexchange.com/questions/381223/evaluation-of-clustering-method
+
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
 
@@ -965,17 +969,17 @@ def doc_clustering(all_data_processed: list, all_data_labels: list, vocab: list,
     doc_data, doc_labels, doc_embeddings, vocab = get_doc_embeddings(all_data_processed, all_data_labels,
                                                                      vocab, doc_embedding_type, w2v_params)
 
-    k_10_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0, "nmf": 0}
-    best_c_v = {"kmeans": 0, "agglomerative": 0, "spectral": 0, "nmf": 0}
-    k_10_topics = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
-    best_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
+    k_10_ari = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
+    best_ari = {"kmeans": 0, "agglomerative": 0, "spectral": 0}
+    k_10_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
+    best_ari_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
 
-    worst_c_v = {"kmeans": 1, "agglomerative": 1, "spectral": 1, "nmf": 1}
-    worst_c_v_topics = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
+    worst_ari = {"kmeans": 1, "agglomerative": 1, "spectral": 1}
+    worst_ari_topics = {"kmeans": None, "agglomerative": None, "spectral": None}
 
-    y_c_v_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": [], "nmf": []}
-    y_dbs_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": [], "nmf": []}
-    y_u_mass_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": [], "nmf": []}
+    y_nmi_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
+    y_ari_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
+    y_acc_clustering_type = {"kmeans": [], "agglomerative": [], "spectral": []}
 
     for k in x:
 
@@ -986,88 +990,58 @@ def doc_clustering(all_data_processed: list, all_data_labels: list, vocab: list,
             else:
                 clustering_params = {'n_clusters': k}
 
-            clusters_docs, clusters_docs_embeddings, labels = document_clustering(doc_data, doc_embeddings,
-                                                                                  vocab, cluster_type,
-                                                                                  params=clustering_params)
-            print("trying evaluation: ")
-            print(adjusted_rand_score(doc_labels, labels))
+            clusters_docs, clusters_docs_embeddings, labels_predict = document_clustering(doc_data, doc_embeddings,
+                                                                                          vocab, cluster_type,
+                                                                                          params=clustering_params)
 
-            assert 0
-            cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_docs, cs_type='c_v')))
-            dbs = float("{:.2f}".format(davies_bouldin_index(clusters_docs_embeddings)))
-            # cs_u_muss = float("{:.2f}".format(coherence_score(all_data_processed, clusters_docs, cs_type='u_mass')))
-            cs_npmi = average_npmi_topics(all_data_processed, clusters_docs, len(clusters_docs))
+            ami = float("{:.2f}".format(ami_score(labels_true=doc_labels, labels_pred=labels_predict,
+                                                  average_method='arithmetic')))
+            ari = float("{:.2f}".format(ari_score(labels_true=doc_labels, labels_pred=labels_predict)))
+            acc = float("{:.2f}".format(acc_score(labels_true=doc_labels, labels_pred=labels_predict,
+                                                  sample_weight=None)))
 
-            y_c_v_clustering_type[cluster_type].append(cs_c_v)
-            y_u_mass_clustering_type[cluster_type].append(cs_npmi)
-            y_dbs_clustering_type[cluster_type].append(dbs)
+            y_nmi_clustering_type[cluster_type].append(ami)
+            y_acc_clustering_type[cluster_type].append(acc)
+            y_ari_clustering_type[cluster_type].append(ari)
 
-            if cs_c_v > best_c_v[cluster_type]:
-                best_c_v[cluster_type] = cs_c_v
-                best_c_v_topics[cluster_type] = clusters_docs
+            if ari > best_ari[cluster_type]:
+                best_ari[cluster_type] = ari
+                best_ari_topics[cluster_type] = clusters_docs
 
-            if cs_c_v < worst_c_v[cluster_type]:
-                worst_c_v[cluster_type] = cs_c_v
-                worst_c_v_topics[cluster_type] = clusters_docs
+            if ari < worst_ari[cluster_type]:
+                worst_ari[cluster_type] = ari
+                worst_ari_topics[cluster_type] = clusters_docs
 
             if k == 10:
-                k_10_c_v[cluster_type] = cs_c_v
+                k_10_ari[cluster_type] = ari
                 k_10_topics[cluster_type] = clusters_docs
 
-    print("best c_v scores:")
-    for m, b_cs in best_c_v.items():
+    print("best ari scores:")
+    for m, b_cs in best_ari.items():
         print(str(m) + ": " + str(b_cs))
 
     print()
-    print("k=10 c_v scores:")
-    for m, cs_score in k_10_c_v.items():
+    print("k=10 ari scores:")
+    for m, cs_score in k_10_ari.items():
         print(str(m) + ": " + str(cs_score))
 
     # c_v coherence score
-    ys = [l for l in y_c_v_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "Spectral", "NMF"], type='c_v')
-    fig.savefig("visuals/c_v_doc_vs_k.pdf", bbox_inches='tight', transparent=True)
+    ys = [l for l in y_nmi_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="AMI",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='ami')
+    fig.savefig("visuals/ami_doc_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # u_mass coherence score
-    ys = [l for l in y_u_mass_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="NPMI",
-                          color_legends=["K-Means", "Agglomerative", "Spectral", "NMF"], type='c_npmi')
-    fig.savefig("visuals/c_npmi_doc_vs_k.pdf", bbox_inches='tight', transparent=True)
+    ys = [l for l in y_acc_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="ACC",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='acc')
+    fig.savefig("visuals/acc_doc_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # dbs score
-    ys = [l for l in y_dbs_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
-                          color_legends=["K-Means", "Agglomerative", "Spectral", "NMF"], type='dbs')
-    fig.savefig("visuals/dbi_doc_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    best_c_v_topics_lengths = {"kmeans": None, "agglomerative": None, "spectral": None, "nmf": None}
-    for m, topics in best_c_v_topics.items():
-        g, plt = create_circle_tree(topics)
-        fig = plt.gcf()
-        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
-        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
-
-        # k = 10 model
-        g, plt = create_circle_tree(k_10_topics[m])
-        nx.write_graphml(g, "visuals/k=10_" + str(m) + ".graphml")
-
-        # add to best_c_v_topics_lengths
-        best_c_v_topics_lengths[m] = [len(t) for t in topics]
-
-        # write topics
-        write_topics_viz(topics, best_c_v[m], m,
-                         "visuals/best_" + str(m) + ".txt")
-        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], m,
-                         "visuals/worst_" + str(m) + ".txt")
-        # write k = 10 model
-        write_topics_viz(k_10_topics[m], k_10_c_v[m], m,
-                         "visuals/k=10_" + str(m) + ".txt")
-
-    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
-    _, fig = box_plot(best_topics_lengths, ["K-Means", "Agglomerative", "Spectral", "NMF"], "Clustering Types",
-                      "Topic Lengths")
-    fig.savefig("visuals/box_plot_doc.pdf", dpi=100, transparent=True)
+    # ari score
+    ys = [l for l in y_ari_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="ARI",
+                          color_legends=["K-Means", "Agglomerative", "Spectral"], type='ari')
+    fig.savefig("visuals/ari_doc_vs_k.pdf", bbox_inches='tight', transparent=True)
 
 
 if __name__ == "__main__":

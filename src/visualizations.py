@@ -243,7 +243,7 @@ def create_circle_tree(topics: list, n_words: int = 10):
 def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: list, type: str) -> plt:
     fig, ax = vis_prep()
 
-    assert type in ["c_v", "u_mass", "c_npmi", "dbs"], "define the type of scatter plot"
+    assert type in ["c_v", "u_mass", "c_npmi", "dbs", "ari", "ami", "acc"], "define the type of scatter plot"
     assert isinstance(ys[0], list), "ys needs to be a list of list(s)"
     assert len(ys) == len(color_legends), "need a color legend for each y list (ys)"
 
@@ -257,16 +257,22 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
 
     if type == "u_mass":
         y_ticks = [x for x in range(-6, 8, 2)]
-    if type == "c_npmi":
+
+    elif type == "c_npmi":
         # todo: set dynamically with min and max
         y_ticks = [x/10 for x in range(-1, 6, 1)]
+
     elif type == "c_v":
         y_ticks = [x / 10 for x in range(0, 11, 1)]
+
     elif type == "dbs":
         all_y = []
         for y in ys:
             all_y.extend(y)
         y_ticks = [x/10 for x in range(10, 40, 5)]
+    else:
+        assert type in ["ari", "ami", "acc"]
+        y_ticks = [x / 10 for x in range(0, 7, 1)]
 
     ax.set_xlabel(x_label, fontsize='medium')
     ax.set_ylabel(y_label, fontsize='medium')

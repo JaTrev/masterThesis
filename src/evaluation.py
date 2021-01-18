@@ -1,6 +1,7 @@
 from gensim.models.coherencemodel import CoherenceModel
 from gensim import corpora
 import sklearn.metrics
+from sklearn.metrics import adjusted_rand_score, accuracy_score, adjusted_mutual_info_score
 from scipy.spatial import distance
 from collections import Counter
 import numpy as np
@@ -141,6 +142,18 @@ def davies_bouldin_index(topic_word_embeddings: list) -> float:
         temp_topic_words_embeddings.extend(t_word_embeddings)
 
     return sklearn.metrics.davies_bouldin_score(temp_topic_words_embeddings, temp_labels)
+
+
+def ari_score(labels_true, labels_pred):
+    return adjusted_rand_score(labels_true, labels_pred)
+
+
+def acc_score(labels_true, labels_pred, normalize=True, sample_weight=None):
+    return accuracy_score(labels_true, labels_pred, normalize, sample_weight)
+
+
+def ami_score(labels_true, labels_pred, average_method='arithmetic'):
+    return adjusted_mutual_info_score(labels_true, labels_pred, average_method)
 
 
 def compute_aic_bic(data_matrix, labels) -> (float, float):
