@@ -230,7 +230,7 @@ def compute_aic_bic(data_matrix, labels) -> (float, float):
     """
     # assign centers and labels
     centers = [kmeans.cluster_centers_]
-    labels  = kmeans.labels_
+    labels  = kmeans.labels
     #number of clusters
     m = kmeans.n_clusters
     # size of the clusters

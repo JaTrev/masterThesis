@@ -5,10 +5,62 @@ import networkx as nx
 import numpy as np
 from math import sqrt
 from sklearn.manifold import TSNE
+from src.evaluation import *
+
+
+def vis_classification_score(model_type: str, doc_labels_true: list, doc_topics_pred: list, topics: list,
+                             filename):
+    # filename = "visuals/classification_scores.txt"
+
+    with open(filename, "w") as myFile:
+        myFile.write('Model:  ' + str(model_type) + '\n')
+
+        for i_t, topic in enumerate(topics):
+            myFile.write('Topic ' + str(i_t + 1) + '\n')
+
+            for w in topic:
+                myFile.write(str(w) + ' ')
+
+            myFile.write('\n')
+        myFile.write("ari score: " + ": " + str(ari_score(doc_labels_true, doc_topics_pred)) + '\n')
+        myFile.write("ami score: " + ": " + str(ami_score(doc_labels_true, doc_topics_pred)) + '\n')
+
+
+def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, filename: str, dbs_scores: list = None,
+                     n_words: int = 10):
+    assert len(topics_list) == len(c_v_scores)
+    assert len(c_v_scores) == len(nmpi_scores)
+
+    if dbs_scores is not None:
+        assert len(nmpi_scores) == len(dbs_scores)
+
+    if any([len(t) > n_words for topics in topics_list for t in topics]):
+        new_topics_list = [[t[:10] for t in topics] for topics in topics_list]
+        topics_list = new_topics_list
+
+    with open(filename, "w") as myFile:
+
+        for i, topics in enumerate(topics_list):
+
+            for i_t, t in enumerate(topics):
+                myFile.write('Topic ' + str(i_t + 1) + '\n')
+
+                for w in t:
+                    myFile.write(str(w) + ' ')
+
+                myFile.write('\n')
+
+            myFile.write("c_v score: " + ": " + str(c_v_scores[i]) + '\n')
+            myFile.write("nmpi score: " + ": " + str(nmpi_scores[i]) + '\n')
+
+            if dbs_scores is not None:
+                myFile.write("dbs score: " + ": " + str(dbs_scores[i]) + '\n')
+
+            myFile.write('\n\n\n')
 
 
 def vis_prep():
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(10, 10))
     ax.tick_params(axis='both', labelsize=12)
 
     # mpl.rcParams['font.family'] = 'Avenir'
@@ -126,6 +178,7 @@ def hyper_fit(coords: list, IterMax= 99, verbose=False):
 
 
 def create_circle_tree(topics: list, n_words: int = 10):
+    mpl.rcParams.update({'font.size': 14})
 
     if any([len(t) > n_words for t in topics]):
         new_topics = [t[:10] for t in topics]
@@ -259,7 +312,6 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
         y_ticks = [x for x in range(-6, 8, 2)]
 
     elif type == "c_npmi":
-        # todo: set dynamically with min and max
         y_ticks = [x/10 for x in range(-1, 6, 1)]
 
     elif type == "c_v":
@@ -274,8 +326,8 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
         assert type in ["ari", "ami", "acc"]
         y_ticks = [x / 10 for x in range(0, 7, 1)]
 
-    ax.set_xlabel(x_label, fontsize='medium')
-    ax.set_ylabel(y_label, fontsize='medium')
+    ax.set_xlabel(x_label, fontsize='medium', labelpad=4)
+    ax.set_ylabel(y_label, fontsize='medium', labelpad=4)
 
     ax.yaxis.set_ticks(y_ticks)
     ax.xaxis.set_ticks(x)
@@ -283,6 +335,7 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     ax.tick_params(axis='both', labelsize='small')
 
     plt.legend(fontsize='x-small')
+    plt.setp(ax.spines.values(), linewidth=2)
     plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
     return plt, fig
 

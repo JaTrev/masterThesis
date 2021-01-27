@@ -3,6 +3,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from src.misc import *
 import numpy as np
 from sklearn.decomposition import NMF
+import hdbscan
+import umap
 
 
 def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_words: int = 10, random_state: int = 42,
@@ -55,6 +57,20 @@ def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_w
 def kmeans_clustering(word_embeddings: list, word_weights: list = None, params: dict = None) -> list:
     model = KMeans(**params)
     return model.fit_predict(word_embeddings, word_weights)
+
+
+def hdbscan_clustering(embeddings: list, min_cluster_size: int = 10, n_neighbors: int = 15, n_components: int = 5,
+                       do_dim_reduction=False):
+
+    if do_dim_reduction:
+        umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components,
+                               metric='cosine', random_state=123).fit(embeddings)
+        embeddings = umap_model.embedding_
+
+    cluster = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, metric='euclidean',
+                              cluster_selection_method='eom').fit(embeddings)
+
+    return cluster.labels_, cluster.probabilities_
 
 
 def agglomerative_clustering(word_embeddings: list, word_weights: list = None, params: dict = None):
@@ -118,7 +134,7 @@ def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: li
 def word_clusters(processed_docs: list, words: list, word_embeddings: list, vocab: list,
                   clustering_type: str, params: dict,
                   clustering_weight_type: str = 'tf',
-                  ranking_weight_type: str = 'tf') -> (list, list):
+                  ranking_weight_type=None) -> (list, list):
     """
     word_clusters returns a sorted list of words for each cluster
 
@@ -192,8 +208,11 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
         cleaned_cluster_words.append([w for c in cluster_words for w in c])
         cleaned_cluster_embeddings.append([emb for c in cluster_embeddings for emb in c])
 
-    return sort_words(processed_docs, cleaned_cluster_words,
-                      cleaned_cluster_embeddings, weight_type=ranking_weight_type)
+    if ranking_weight_type is None:
+        return cleaned_cluster_words, cleaned_cluster_embeddings
+    else:
+        return sort_words(processed_docs, cleaned_cluster_words, cleaned_cluster_embeddings,
+                          weight_type=ranking_weight_type)
 
 
 def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
@@ -209,13 +228,13 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
     :param params: clustering parameters
     :param clustering_weight_type: word weighting type used for clustering ("tf", "tf-df", "tf-idf")
 
-    :return: list of cluster words for each cluster, list of word embeddings for each cluster (sorted!)
+    :return:
     """
 
     doc_names = [str(i) for i in range(len(doc_data))]
 
     assert len(doc_embeddings) == len(doc_names), "doc_embeddings and word list do not have the same length"
-    assert clustering_type in ['kmeans', 'agglomerative', 'spectral', 'nmf'], "incorrect clustering_type"
+    assert clustering_type in ['kmeans', 'agglomerative'], "incorrect clustering_type"
 
     clustering_dict = {
         'kmeans': kmeans_clustering,
@@ -228,40 +247,22 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
     doc_weights_dict = get_doc_weights(doc_data, vocab, weight_type=clustering_weight_type)
     doc_weights = [doc_weights_dict[doc] for doc in doc_names]
 
-    if clustering_type in clustering_dict.keys():
-        # cluster words to cluster labels
-        labels = clustering_dict[clustering_type](doc_embeddings, doc_weights, params)
+    # cluster words to cluster labels
+    labels = clustering_dict[clustering_type](doc_embeddings, doc_weights, params)
 
-        # assign each word to cluster list
-        cluster_docs = [[] for _ in range(len(set(labels)))]
-        cluster_embeddings = [[] for _ in range(len(cluster_docs))]
-        for l_id, label in enumerate(list(labels)):
+    # assign each word to cluster list
+    cluster_docs = [[] for _ in range(len(set(labels)))]
+    cluster_embeddings = [[] for _ in range(len(cluster_docs))]
 
-            cluster_docs[label].append(doc_data[l_id])
-            cluster_embeddings[label].append(doc_embeddings[l_id])
+    for l_id, label in enumerate(list(labels)):
 
-    else:
-        assert clustering_type == "nmf"
-        assert 0
-        # todo: implement NMF for document clustering
+        cluster_docs[label].append(doc_data[l_id])
+        cluster_embeddings[label].append(doc_embeddings[l_id])
 
-    # remove clusters with <= 5 words:
-    cleaned_cluster_docs = []
-    cleaned_cluster_embeddings = []
-    for i_c, c in enumerate(cluster_docs):
+    # todo: implement NMF for document clustering
 
-        if len(c) <= 5:
-            continue
-        cleaned_cluster_docs.append(c)
-        cleaned_cluster_embeddings.append(cluster_embeddings[i_c])
-
-    # if no clusters have >= 6 words
-    if len(cleaned_cluster_docs) == 0:
-        print("No clusters found!")
-        cleaned_cluster_docs.append([])
-        cleaned_cluster_embeddings.append([])
-
-    return cleaned_cluster_docs, cleaned_cluster_embeddings, labels
+    assert len(labels) == len(doc_data)
+    return cluster_docs, cluster_embeddings, labels, doc_data
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from gensim.models import LsiModel, LdaModel
 from gensim import corpora
 from gensim.models.wrappers import LdaMallet
 from sklearn.decomposition import NMF
+import numpy as np
 
 
 def lsa_topics(processed_data: list, n_topics: int = 10, n_words: int = 10):
@@ -35,10 +36,19 @@ def lda_topics(processed_data: list, n_topics: int = 10, learning_decay: float =
         topic = [lda_model.id2word[w_id] for w_id,_ in lda_model.get_topic_terms(i_t, topn=n_words)]
         topics.append(topic)
 
-    return topics
+    # getting documents topic labels
+    doc_topics = []
+    for doc in doc_term_matrix:
+
+        doc_t_dist = sorted(lda_model.get_document_topics(doc), key=lambda item: item[1], reverse=True)
+        t, _ = doc_t_dist[0]
+        doc_topics.append(t)
+
+    assert len(doc_topics) == len(processed_data)
+    return topics, doc_topics
 
 
-def lda_mallet_topics(processed_data: list, n_topics: int = 10, n_words: int = 10, n_iterations: int = 1000):
+def lda_mallet_topics(processed_data: list, n_topics: int = 10, n_words: int = 10, n_iterations: int = 100):
     mallet_path = 'data/mallet-2.0.8/bin/mallet'
     dictionary = corpora.Dictionary(processed_data, )
     doc_term_matrix = [dictionary.doc2bow(doc) for doc in processed_data]
@@ -77,12 +87,21 @@ def nmf_topics(preprocessed_data: list, vocabulary: list, n_topics: int = 10,
         feature_names = tf_vectorizer.get_feature_names()
 
     nmf_model = NMF(n_components=n_topics, init=init, beta_loss=beta_loss, solver=solver,
-                    max_iter=1000, alpha=.1, l1_ratio=.5, random_state=42).fit(new_data)
+                    max_iter=1000, alpha=.1, l1_ratio=.5, random_state=42)
+
+    w = nmf_model.fit_transform(new_data)
 
     topics = []
     for topic_idx, topic in enumerate(nmf_model.components_):
         top_features = [feature_names[i] for i in topic.argsort()[:-n_words - 1:-1]]
         topics.append(top_features)
-    return topics
+
+    doc_topics = []
+    for w_doc in w:
+        topic_dict = w_doc.argsort()[::-1]
+        doc_topics.append(topic_dict[0])
+
+    return topics, doc_topics
+
 
 

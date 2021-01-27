@@ -84,6 +84,47 @@ def create_networkx_graph(words: list, word_embeddings: list, similarity_thresho
     return remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes)
 
 
+def create_networkx_graph_2(words: list, word_embeddings: list, similarity_threshold: float = 0.4,
+                          percentile_cutoff: int = 80, remove_isolated_nodes: bool = True):
+    """
+    create_networdx_graph creates a graph given the words and their embeddings
+    :param words: list of words which will be the nodes
+    :param word_embeddings: embeddings of the words
+    :param similarity_threshold: cosine similarity threshold value for the edges
+    :param percentile_cutoff: percentile threshold value
+    :param remove_isolated_nodes: boolean indicating if isolated nodes should be removed
+    :return: graph
+    """
+    assert len(words) == len(word_embeddings), "words and word_embeddings must have the same length"
+    graph = nx.Graph()  # undirected graph
+
+    # nodes index -> index used in words to get the word
+    graph.add_nodes_from(list(range(len(words))))
+    n = 0
+    edge_weights = []
+
+    for i, word_i in enumerate(words):
+        for j, word_j in enumerate(words):
+
+            if i != j:
+                if not (graph.has_edge(j, i)):
+
+                    sim = cosine_similarity(word_embeddings[i].reshape(1, -1),
+                                            word_embeddings[j].reshape(1, -1))
+
+                    if sim < similarity_threshold:
+                        # similarity is not high enough
+                        continue
+
+                    weight = sim
+                    graph.add_edge(i, j, weight=float(weight))
+                    edge_weights.append(weight)
+                    n = n + 1
+
+    new_graph = remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes)
+    return new_graph
+
+
 def create_graph_with_features(graph: nx.Graph, node_list: list, feature_list: list, node_features: str = "feature"):
 
     assert len(node_list) == len(feature_list), "the feature_list must have a feature for each node"

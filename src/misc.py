@@ -1,3 +1,5 @@
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 from collections import Counter
 import math
 
@@ -70,3 +72,11 @@ def get_word_weights(processed_docs: list, vocab: list, n_words: int, weight_typ
     assert len(word_weight) == len(vocab)
 
     return word_weight
+
+
+def get_most_similar_indices(embedding, list_embedding, n_most_similar: int = 10):
+
+    sim_matrix = cosine_similarity(embedding.reshape(1, -1), list_embedding)[0]
+    most_sim = np.argsort(sim_matrix, axis=None)[:: -1]
+
+    return most_sim[:n_most_similar]

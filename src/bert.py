@@ -313,7 +313,7 @@ def calculate_bert_embeddings(model: BertForMaskedLM, data_loader: DataLoader = 
         # logit = output[1]
         # hidden_states = output[2], shape: [#batch, 256, 768]
         if get_cls_token:
-            embeddings.extend([b for b in output[-2:][1][bert_layer][0]])
+            embeddings.extend([b for b in output[-2:][1][bert_layer][:, 0, :]])
         else:
             embeddings.extend([b for b in output[2][bert_layer]])
 

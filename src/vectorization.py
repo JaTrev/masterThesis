@@ -23,9 +23,9 @@ def get_saved_w2v_model(w2v_model: str) -> Word2Vec:
     return w2v_model
 
 
-def create_w2v_model(processed_data: list, min_c: int, win: int, negative: int, ns_exponent: float, seed: int,
-                     sample: float = 6e-5, alpha: float = 0.03, min_alpha: float = 0.0007,
-                     epochs: int = 30, size: int = 300):
+def create_w2v_model(processed_data: list, min_c: int, win: int, negative: int, seed: int,
+                     sample: float = 6e-5, alpha: float = 0.03, min_alpha: float = 0.0007, ns_exponent: float = 0.75,
+                     epochs: int = 30, size: int = 300, sg=0, cbow_mean=1, hs=0):
 
     w2v_model = Word2Vec(min_count=min_c,
                          window=win,
@@ -38,7 +38,11 @@ def create_w2v_model(processed_data: list, min_c: int, win: int, negative: int, 
                          sorted_vocab=1,
                          seed=seed,
                          compute_loss=True,
-                         workers=1)
+                         workers=1,
+                         sg=sg,
+                         cbow_mean=cbow_mean,
+                         hs=hs
+                         )
     w2v_model.build_vocab(processed_data, progress_per=10000)
     w2v_model.train(processed_data,
                     total_examples=w2v_model.corpus_count,
@@ -69,8 +73,8 @@ def get_word_vectors(processed_data: list, vocab: list, saved_model=None, params
 
         assert isinstance(params, dict), "missing w2v_model params"
 
-        assert {'min_c', 'win', 'negative', 'ns_exponent', 'seed'}.issubset(params.keys()), (
-            "missing w2v_model params, need: min_c', 'win','negative', 'ns_exponent', 'seed'")
+        assert {'min_c', 'win', 'negative', 'seed'}.issubset(params.keys()), (
+            "missing w2v_model params, need: min_c', 'win', 'negative',', 'seed'")
 
         w2v_model = create_w2v_model(processed_data, **params)
 
@@ -266,7 +270,7 @@ def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, emb
 
     doc_embeddings = []
 
-    if embedding_type == "w2v_mean":
+    if embedding_type == "w2v_avg":
         vocab_words, vocab_embeddings, _ = get_word_vectors(processed_data=processed_data, vocab=vocab, params=params)
 
         doc_data = []
@@ -290,7 +294,29 @@ def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, emb
                 print("---------")
                 continue
 
-        vocab = vocab_words
+    elif embedding_type == "w2v_sum":
+        vocab_words, vocab_embeddings, _ = get_word_vectors(processed_data=processed_data, vocab=vocab, params=params)
+
+        doc_data = []
+        doc_labels = []
+        for i, doc in enumerate(processed_data):
+            if any([w in doc for w in vocab_words]):
+                doc_data.append(doc)
+                doc_labels.append(data_labels[i])
+
+        for i, doc in enumerate(doc_data):
+            temp_embeddings = [vocab_embeddings[vocab_words.index(w)] for w in doc if w in vocab_words]
+
+            if len(temp_embeddings) > 1:
+                doc_embeddings.append(np.sum(temp_embeddings, axis=0))
+
+            elif len(temp_embeddings) == 1:
+                doc_embeddings.append(temp_embeddings[0])
+            else:
+                print("error")
+                print([w for w in doc if w in vocab_words])
+                print("---------")
+                continue
 
     else:
         assert embedding_type == "doc2vec"
@@ -301,22 +327,88 @@ def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, emb
             if any([w in doc for w in vocab]):
                 doc_data.append(doc)
                 doc_labels.append(data_labels[i])
-        _, _, doc_embeddings, _ = get_doc2vec_embeddings(doc_data, vocab, **params)
+        vocab_words, vocab_embeddings, doc_embeddings, _ = get_doc2vec_embeddings(doc_data, vocab, **params)
 
     assert all([len(doc_embeddings[0]) == len(e) for e in doc_embeddings])
     assert len(doc_data) == len(doc_embeddings)
     assert len(doc_data) == len(doc_labels)
-    return doc_data, doc_labels, doc_embeddings, vocab
+    return doc_data, doc_labels, doc_embeddings, vocab_words, vocab_embeddings
 
 
-def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: int, negative: int, ns_exponent: float,
+def get_avg_sentence_doc_embeddings_w2v_2(original_data: list, nodes: list, vocab: list, vocab_embeddings):
+    # calculate sentence embeddings based on vocab avg
+    # nodes have indices not words
+
+    data_sentences = []
+    sentence_embeddings = []
+
+    data_docs = []
+    doc_embeddings = []
+
+    for doc in original_data:
+        sents = doc.split(" . ")
+
+        temp_doc_embedds = []
+
+        for sent in sents:
+            sent_lower = sent.lower().split()
+
+            temp = [vocab_embeddings[vocab.index(w)] for w in sent_lower if w in vocab]
+
+            # sentence has to have more than 1 word
+            if len(temp) > 1:
+                sent_embedding = np.average(temp, axis=0)
+
+                sentence_embeddings.append(sent_embedding)
+                data_sentences.append(sent_lower)
+
+                temp_doc_embedds.append(sent_embedding)
+
+        # doc has to have at least 1 sentence
+        if len(temp_doc_embedds) > 0:
+            data_docs.append(doc.lower())
+
+            if len(temp_doc_embedds) == 1:
+                doc_embeddings.append(temp_doc_embedds[0])
+
+            elif len(temp_doc_embedds) > 1:
+                doc_embeddings.append(np.average(temp_doc_embedds, axis=0))
+
+    node_sentence_embeddings = {}
+    node_doc_embeddings = {}
+    for node in nodes:
+
+        # calculate sentence embeddings for each word (node)
+        sent_ids = [i_s for i_s, s in enumerate(data_sentences) if vocab[node] in s]
+
+        sents_embds = [sentence_embeddings[sent_id] for sent_id in sent_ids]
+        sents_avg_embd = np.average(sents_embds, axis=0)
+        node_sentence_embeddings[node] = sents_avg_embd
+
+        # calculate doc embeddings for each word (node)
+
+        doc_ids = [i_d for i_d, doc in enumerate(data_docs) if vocab[node] in doc.split()]
+        doc_embds = [doc_embeddings[doc_id] for doc_id in doc_ids]
+
+        if len(doc_embds) == 1:
+            node_doc_embeddings[node] = doc_embds[0]
+        elif len(doc_embds) > 1:
+            node_doc_embeddings[node] = np.average(doc_embds, axis=0)
+
+    assert len(node_doc_embeddings) == len(nodes)
+    assert len(node_sentence_embeddings) == len(nodes)
+
+    return node_sentence_embeddings, node_doc_embeddings
+
+
+def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: int, negative: int, hs: int,
                            seed: int, sample: float = 6e-5, alpha: float = 0.03, min_alpha: float = 0.0007,
-                           epochs: int = 30, size: int = 300):
+                           epochs: int = 30, size: int = 300, ns_exponent: float = 0.75):
 
     documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(processed_data)]
     d2v_model = Doc2Vec(documents, min_count=min_c, window=win, vector_size=size, sample=sample, alpha=alpha,
-                        min_alpha=min_alpha, negative=negative, ns_exponent=ns_exponent, seed=seed,
-                        compute_loss=True, workers=1, epochs=epochs, sorted_vocab=1)
+                        min_alpha=min_alpha, negative=negative, ns_exponent=ns_exponent, seed=seed, compute_loss=True,
+                        workers=1, epochs=epochs, sorted_vocab=1, hs=hs)
 
     # normalize vectors:
     d2v_model.init_sims(replace=True)
@@ -324,11 +416,16 @@ def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: i
     # vocab_words and vocab_embeddings are sorted like vocab
     vocab_words = [w for w in vocab if w in d2v_model.wv.index2word]
     vocab_embeddings = [d2v_model.wv.vectors[d2v_model.wv.index2word.index(w)]
-                        for w in vocab if w in d2v_model.wv.index2word]
+                        for w in vocab_words]
 
     doc_embeddings = [d2v_model.docvecs[i] for i in range(len(processed_data))]
 
     return vocab_words, vocab_embeddings, doc_embeddings, d2v_model
+
+
+def get_topic_vector(topic_embeddings: list):
+
+    return np.average(topic_embeddings, axis=0)
 
 
 if __name__ == "__main__":

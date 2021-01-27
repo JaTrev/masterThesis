@@ -32,7 +32,7 @@ stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really"])
 
 
 def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_lemmatizing: bool = False,
-                  remove_low_freq: bool = False) -> (list, list, list):
+                  remove_low_freq: bool = False, do_stop_word_removal=True) -> (list, list, list):
     """
     Document for processing a list of documents.
 
@@ -61,8 +61,10 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
         tkns = [w for w in tkns if w.isalpha()]
 
         # remove stop words before stemming/lemmatizing
-        doc_tkns = [w for w in tkns if w not in stop_words]
-        # tkns = [w for w in doc_tkns]
+        if do_stop_word_removal:
+            doc_tkns = [w for w in tkns if w not in stop_words]
+        else:
+            doc_tkns = [w for w in tkns]
 
         # remove all words that are not nouns
         tkns = [w for (w, pos) in nltk.pos_tag(doc_tkns) if pos in ['NN', 'NNP', 'NNS', 'NNPS']]
