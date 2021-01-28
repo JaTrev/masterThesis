@@ -710,6 +710,109 @@ def alberta_visualization(all_data_processed: list, vocab: list, tokenized_docs:
     fig.savefig("visuals/box_plot_alberta.pdf", dpi=100, transparent=True)
 
 
+
+def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
+
+    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
+
+    best_c_v = {1: 0, 2: 0, 3: 0}
+    best_c_v_topics = {1: None, 2: None, 3: None}
+
+    worst_c_v = {1: 1, 2: 1, 3: 1}
+    worst_c_v_topics = {1: None, 2: None, 3: None}
+
+    y_c_v_clustering_type = {1: [], 2: [], 3: []}
+    y_dbs_clustering_type = {1: [], 2: [], 3: []}
+    y_u_mass_clustering_type = {1: [], 2: [], 3: []}
+
+    x = [0.4]
+
+    for sim in x:
+
+        graph = create_networkx_graph_2(vocab_words, vocab_embeddings, similarity_threshold=0, percentile_cutoff=50)
+
+        node_sentence_embeddings, node_doc_embeddings = get_avg_sentence_doc_embeddings_w2v_2(original_data,
+                                                                                              list(graph.nodes()),
+                                                                                              vocab_words,
+                                                                                              vocab_embeddings)
+        node_features = []
+        for node in graph.nodes():
+            embedding = w2v_model.wv.vectors[w2v_model.wv.index2word.index(vocab_words[node])]
+            sentence_embedding = node_sentence_embeddings[node]
+            doc_embedding = node_doc_embeddings[node]
+
+            node_feature = embedding.tolist()
+            # node_feature.extend(sentence_embedding)
+
+            node_features.append(node_feature)
+
+        # feature_graph = create_graph_with_features(graph, list(graph.nodes()), node_features)
+
+        model = karateclub.TENE()
+        model.fit(graph, np.array(node_features))
+        node_embeddings = model.get_embedding()
+        node_words = [vocab_words[n] for n in graph.nodes]
+
+        clusters_words, clusters_words_embeddings = word_clusters(
+            all_data_processed, node_words, node_embeddings, vocab, clustering_type="kmeans",
+            params={'n_clusters': 10, 'random_state': 42, }, clustering_weight_type='tf',
+            ranking_weight_type='tf'
+        )
+
+        for t in clusters_words:
+            print(t[:10])
+        cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
+        print(cs_c_v)
+
+
+if __name__ == "__main__":
+    all_data_processed, all_data_labels, vocab, tokenized_docs = preprocessing(all_data,
+                                                                               all_data_label,
+                                                                               do_lemmatizing=True,
+                                                                               do_stop_word_removal=True)
+    #####
+    # document space
+    ####
+    # get_baseline(all_data_processed, vocab, tokenized_docs, all_data_labels)
+    # doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
+
+    #####
+    # word space
+    ####
+    # get_w2v_vis_sign_words(all_data_processed, vocab, tokenized_docs)
+    # get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
+    # get_graph_components(all_data_processed, vocab, tokenized_docs)
+    get_sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
+
+    # get_baseline_vis(all_data_processed, vocab)
+    # vis_most_common_words(all_data_processed)
+    # print("Trying Lemmatizing")
+
+    # new_vocab, vocab_embeddings = get_fast_text_embeddings(vocab)
+
+    # w2v_visualization(all_data_processed, vocab, tokenized_docs)
+    # get_w2v_vis_sign_words(all_data_processed, vocab, tokenized_docs)
+    # doc2vec_visualization(all_data_processed, vocab, tokenized_docs)
+
+    # fast_text_visualization(all_data_processed, vocab, tokenized_docs)
+
+    # bert_visualization(all_data_processed, vocab, tokenized_docs)
+
+    # graph_k_components(all_data, all_data_processed, tokenized_docs)
+
+    # sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
+
+    # doc_clustering(all_data_processed, all_data_labels, vocab, tokenized_docs)
+
+    # karate_club(all_data, all_data_processed, vocab, tokenized_docs)
+
+    # alberta_visualization(all_data_processed, vocab, tokenized_docs)
+
+    # get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
+
+
+
+"""
 def graph_k_components(original_data, all_data_processed, vocab, tokenized_docs):
 
     vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
@@ -761,47 +864,8 @@ def graph_k_components(original_data, all_data_processed, vocab, tokenized_docs)
                 worst_c_v[k_component] = cs_c_v
                 worst_c_v_topics[k_component] = cluster_words
 
-    print("best c_v scores:")
-    for k, b_cs in best_c_v.items():
-        print(str(k) + ": " + str(b_cs))
 
-    # c_v coherence score
-    ys = [l for l in y_c_v_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
-    fig.savefig("visuals/c_v_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # u_mass coherence score
-    ys = [l for l in y_u_mass_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="NPMI",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
-    fig.savefig("visuals/c_npmi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # dbs score
-    ys = [l for l in y_dbs_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
-                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
-    fig.savefig("visuals/dbi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    best_c_v_topics_lengths = {1: None, 2: None, 3: None}
-    for m, topics in best_c_v_topics.items():
-        g, plt = create_circle_tree(topics)
-        fig = plt.gcf()
-        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
-        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
-
-        # add to best_c_v_topics_lengths
-        best_c_v_topics_lengths[m] = [len(t) for t in topics]
-
-        # write topics
-        write_topics_viz(topics, best_c_v[m], str(m),
-                         "visuals/best_" + str(m) + ".txt")
-        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], str(m),
-                         "visuals/worst_" + str(m) + ".txt")
-
-    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
-    _, fig = box_plot(best_topics_lengths, ["K=1", "K=2", "K=3"], "k-Components", "Topic Lengths")
-    fig.savefig("visuals/box_plot_graph.pdf", dpi=100, transparent=True)
 
 
 def sage_graph_k_components(original_data, all_data_processed, vocab, tokenized_docs):
@@ -934,99 +998,58 @@ def sage_graph_k_components(original_data, all_data_processed, vocab, tokenized_
     fig.savefig("visuals/box_plot_graph.pdf", dpi=100, transparent=True)
 
 
-def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
-
-    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
-
-    best_c_v = {1: 0, 2: 0, 3: 0}
-    best_c_v_topics = {1: None, 2: None, 3: None}
-
-    worst_c_v = {1: 1, 2: 1, 3: 1}
-    worst_c_v_topics = {1: None, 2: None, 3: None}
-
-    y_c_v_clustering_type = {1: [], 2: [], 3: []}
-    y_dbs_clustering_type = {1: [], 2: [], 3: []}
-    y_u_mass_clustering_type = {1: [], 2: [], 3: []}
-
-    x = [0.4]
-
-    for sim in x:
-
-        graph = create_networkx_graph_2(vocab_words, vocab_embeddings, similarity_threshold=0, percentile_cutoff=50)
-
-        node_sentence_embeddings, node_doc_embeddings = get_avg_sentence_doc_embeddings_w2v_2(original_data,
-                                                                                              list(graph.nodes()),
-                                                                                              vocab_words,
-                                                                                              vocab_embeddings)
-        node_features = []
-        for node in graph.nodes():
-            embedding = w2v_model.wv.vectors[w2v_model.wv.index2word.index(vocab_words[node])]
-            sentence_embedding = node_sentence_embeddings[node]
-            doc_embedding = node_doc_embeddings[node]
-
-            node_feature = embedding.tolist()
-            # node_feature.extend(sentence_embedding)
-
-            node_features.append(node_feature)
-
-        # feature_graph = create_graph_with_features(graph, list(graph.nodes()), node_features)
-
-        model = karateclub.TENE()
-        model.fit(graph, np.array(node_features))
-        node_embeddings = model.get_embedding()
-        node_words = [vocab_words[n] for n in graph.nodes]
-
-        clusters_words, clusters_words_embeddings = word_clusters(
-            all_data_processed, node_words, node_embeddings, vocab, clustering_type="kmeans",
-            params={'n_clusters': 10, 'random_state': 42, }, clustering_weight_type='tf',
-            ranking_weight_type='tf'
-        )
-
-        for t in clusters_words:
-            print(t[:10])
-        cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
-        print(cs_c_v)
 
 
-if __name__ == "__main__":
-    all_data_processed, all_data_labels, vocab, tokenized_docs = preprocessing(all_data,
-                                                                               all_data_label,
-                                                                               do_lemmatizing=True,
-                                                                               do_stop_word_removal=True)
-    #####
-    # document space
-    ####
-    # get_baseline(all_data_processed, vocab, tokenized_docs, all_data_labels)
-    # doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
-    #####
-    # word space
-    ####
-    # get_w2v_vis_sign_words(all_data_processed, vocab, tokenized_docs)
-    get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
 
-    # get_baseline_vis(all_data_processed, vocab)
-    # vis_most_common_words(all_data_processed)
-    # print("Trying Lemmatizing")
 
-    # new_vocab, vocab_embeddings = get_fast_text_embeddings(vocab)
 
-    # w2v_visualization(all_data_processed, vocab, tokenized_docs)
-    # get_w2v_vis_sign_words(all_data_processed, vocab, tokenized_docs)
-    # doc2vec_visualization(all_data_processed, vocab, tokenized_docs)
 
-    # fast_text_visualization(all_data_processed, vocab, tokenized_docs)
 
-    # bert_visualization(all_data_processed, vocab, tokenized_docs)
 
-    # graph_k_components(all_data, all_data_processed, tokenized_docs)
 
-    # sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
 
-    # doc_clustering(all_data_processed, all_data_labels, vocab, tokenized_docs)
+    print("best c_v scores:")
+    for k, b_cs in best_c_v.items():
+        print(str(k) + ": " + str(b_cs))
 
-    # karate_club(all_data, all_data_processed, vocab, tokenized_docs)
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
+    fig.savefig("visuals/c_v_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # alberta_visualization(all_data_processed, vocab, tokenized_docs)
+    # u_mass coherence score
+    ys = [l for l in y_u_mass_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="NPMI",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
+    fig.savefig("visuals/c_npmi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
+                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
+    fig.savefig("visuals/dbi_graph_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    best_c_v_topics_lengths = {1: None, 2: None, 3: None}
+    for m, topics in best_c_v_topics.items():
+        g, plt = create_circle_tree(topics)
+        fig = plt.gcf()
+        fig.savefig("visuals/best_" + str(m) + ".pdf", dpi=100, transparent=True)
+        nx.write_graphml(g, "visuals/best_" + str(m) + ".graphml")
+
+        # add to best_c_v_topics_lengths
+        best_c_v_topics_lengths[m] = [len(t) for t in topics]
+
+        # write topics
+        write_topics_viz(topics, best_c_v[m], str(m),
+                         "visuals/best_" + str(m) + ".txt")
+        write_topics_viz(worst_c_v_topics[m], worst_c_v[m], str(m),
+                         "visuals/worst_" + str(m) + ".txt")
+
+    best_topics_lengths = [l for l in best_c_v_topics_lengths.values()]
+    _, fig = box_plot(best_topics_lengths, ["K=1", "K=2", "K=3"], "k-Components", "Topic Lengths")
+    fig.savefig("visuals/box_plot_graph.pdf", dpi=100, transparent=True)
+
+
+"""

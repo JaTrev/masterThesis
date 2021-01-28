@@ -98,31 +98,35 @@ def get_avg_sentence_doc_embeddings_w2v(original_data: list, nodes: list, vocab:
     for doc in original_data:
         sents = doc.split(" . ")
 
-        temp_doc_embedds = []
+        doc_embedds_list = []
 
         for sent in sents:
-            sent_lower = sent.lower().split()
+            sent_words = sent.lower().split()
 
-            temp = [vocab_embeddings[vocab.index(w)] for w in sent_lower if w in vocab]
 
-            # sentence has to have more than 1 word
-            if len(temp) > 1:
-                sent_embedding = np.average(temp, axis=0)
+            sent_embedds_list = [vocab_embeddings[vocab.index(w)] for w in sent_words if w in vocab]
 
-                sentence_embeddings.append(sent_embedding)
-                data_sentences.append(sent_lower)
+            # sentence has at least 1 word
+            if len(sent_embedds_list) > 1:
+                sent_embedding = np.average(sent_embedds_list, axis=0)
+            elif len(sent_embedds_list) == 1:
+                sent_embedding = sent_embedds_list[0]
 
-                temp_doc_embedds.append(sent_embedding)
+            sentence_embeddings.append(sent_embedding)
+            data_sentences.append(sent_words)
+
+            doc_embedds_list.append(sent_embedding)
 
         # doc has to have at least 1 sentence
-        if len(temp_doc_embedds) > 0:
+        if len(doc_embedds_list) > 0:
+
             data_docs.append(doc.lower())
 
-            if len(temp_doc_embedds) == 1:
-                doc_embeddings.append(temp_doc_embedds[0])
+            if len(doc_embedds_list) == 1:
+                doc_embeddings.append(doc_embedds_list[0])
 
-            elif len(temp_doc_embedds) > 1:
-                doc_embeddings.append(np.average(temp_doc_embedds, axis=0))
+            elif len(doc_embedds_list) > 1:
+                doc_embeddings.append(np.average(doc_embedds_list, axis=0))
 
     node_sentence_embeddings = {}
     node_doc_embeddings = {}
@@ -132,18 +136,27 @@ def get_avg_sentence_doc_embeddings_w2v(original_data: list, nodes: list, vocab:
         sent_ids = [i_s for i_s, s in enumerate(data_sentences) if node in s]
 
         sents_embds = [sentence_embeddings[sent_id] for sent_id in sent_ids]
-        sents_avg_embd = np.average(sents_embds, axis=0)
-        node_sentence_embeddings[node] = sents_avg_embd
+
+        if len(sents_embds) == 1:
+            node_sentence_embeddings[node] = sents_embds[0]
+
+        elif len(sents_embds) > 1:
+            node_sentence_embeddings[node] = np.average(sents_embds, axis=0)
+        else:
+            print("missing node's sentence embedding (in get_avg_sentence_doc_embeddings_w2v): " + str(node))
+            assert 0
 
         # calculate doc embeddings for each word (node)
-
-        doc_ids = [i_d for i_d, doc in enumerate(data_docs) if node in doc.split()]
+        doc_ids = [i_d for i_d, doc in enumerate(data_docs) for sent in doc.split() if node in sent]
         doc_embds = [doc_embeddings[doc_id] for doc_id in doc_ids]
 
         if len(doc_embds) == 1:
             node_doc_embeddings[node] = doc_embds[0]
         elif len(doc_embds) > 1:
             node_doc_embeddings[node] = np.average(doc_embds, axis=0)
+        else:
+            print("missing node's doc embedding (in get_avg_sentence_doc_embeddings_w2v): " + str(node))
+            assert 0
 
     assert len(node_doc_embeddings) == len(nodes)
     assert len(node_sentence_embeddings) == len(nodes)

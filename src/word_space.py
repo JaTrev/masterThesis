@@ -1,6 +1,7 @@
 from src.visualizations import *
 from src.vectorization import *
 from src.clustering import *
+from src.graphs import *
 
 
 def get_w2v_vis_sign_words(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
@@ -126,14 +127,13 @@ def get_w2v_vis_topic_vec(all_data_processed: list, vocab: list, tokenized_docs:
     # 'ns_exponent': w2v_model.ns_exponent, 'seed': 42}
 
     w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
 
     y_c_v_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
     y_dbs_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
     y_npmi_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
 
     y_topics = {'kmeans': [], 'agglomerative': [], 'hdbscan': []}
-
-    words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
 
     for k in x:
 
@@ -200,7 +200,7 @@ def get_w2v_vis_topic_vec(all_data_processed: list, vocab: list, tokenized_docs:
                           color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
     fig.savefig("visuals/ws_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # u_mass coherence score
+    # npmi coherence score
     ys = [l for l in y_npmi_model.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
                           color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
@@ -209,6 +209,185 @@ def get_w2v_vis_topic_vec(all_data_processed: list, vocab: list, tokenized_docs:
     for m in list(y_topics.keys()):
         vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], "visuals/ws_clusters_eval_" + str(m) + ".txt",
                          dbs_scores=y_dbs_model[m])
+
+
+def get_graph_components(all_data_processed, vocab, tokenized_docs):
+    n_words = len([w for d in all_data_processed for w in d])
+    word_weights = get_word_weights(all_data_processed, vocab, n_words, weight_type='tf')
+
+    w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+
+    y_topics = {1: [], 2: [], 3: []}
+    y_c_v_clustering_type = {1: [], 2: [], 3: []}
+    y_dbs_clustering_type = {1: [], 2: [], 3: []}
+    y_npmi_clustering_type = {1: [], 2: [], 3: []}
+
+    x = [x/100 for x in range(50, 100, 10)] + [.95]
+
+    for sim in x:
+
+        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+
+        components_all = apxa.k_components(graph)
+
+        for k_component in [1, 2, 3]:
+
+            print("k_component: " + str(k_component))
+            components = components_all[k_component]
+
+            corpus_clusters = []
+            for comp in components:
+                if len(comp) >= 6:
+                    corpus_clusters.append(comp)
+
+            cluster_words = [sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_weights)),
+                                    reverse=True) for c in corpus_clusters]
+
+            if len(cluster_words) <= 2:
+                print("here for: " + str(k_component) + ", " + str(sim))
+                cs_c_v = -1000.0
+                dbs = -1000.0
+                cs_npmi = -1000.0
+
+            else:
+
+                cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
+                                      for words in cluster_words]
+
+                cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, cluster_words, cs_type='c_v')))
+                dbs = float("{:.2f}".format(davies_bouldin_index(cluster_embeddings)))
+                cs_npmi = float("{:.2f}".format(average_npmi_topics(all_data_processed, cluster_words,
+                                                                    len(cluster_words))))
+
+            y_c_v_clustering_type[k_component].append(cs_c_v)
+            y_npmi_clustering_type[k_component].append(cs_npmi)
+            y_dbs_clustering_type[k_component].append(dbs)
+
+            y_topics[k_component].append(cluster_words)
+
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
+    fig.savefig("visuals/graph_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # npmi coherence score
+    ys = [l for l in y_npmi_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="NPMI",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
+    fig.savefig("visuals/graph_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
+                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
+    fig.savefig("visuals/graph_dbi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    for m in list(y_topics.keys()):
+        vis_topics_score(y_topics[m], y_c_v_clustering_type[m], y_npmi_clustering_type[m],
+                         "visuals/graph_clusters_eval_" + str(m) + ".txt", dbs_scores=y_dbs_clustering_type[m])
+
+
+def get_sage_graph_k_components(original_data, all_data_processed, vocab, tokenized_docs):
+    n_words = len([w for d in all_data_processed for w in d])
+    word_weights = get_word_weights(all_data_processed, vocab, n_words, weight_type='tf')
+
+    # vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
+    w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+
+    y_topics = {1: [], 2: [], 3: []}
+
+    y_c_v_clustering_type = {1: [], 2: [], 3: []}
+    y_dbs_clustering_type = {1: [], 2: [], 3: []}
+    y_npmi_clustering_type = {1: [], 2: [], 3: []}
+
+    # x = [0.4, 0.5]
+    x = [x / 100 for x in range(50, 100, 10)] + [.95]
+
+    for sim in x:
+
+        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+
+        node_sentence_embeddings, node_doc_embeddings = get_avg_sentence_doc_embeddings_w2v(original_data,
+                                                                                            list(graph.nodes()),
+                                                                                            vocab_words,
+                                                                                            vocab_embeddings)
+        node_features = []
+        for node in graph.nodes():
+            embedding = w2v_model.wv.vectors[w2v_model.wv.index2word.index(node)]
+            sentence_embedding = node_sentence_embeddings[node]
+            doc_embedding = node_doc_embeddings[node]
+
+            node_feature = embedding.tolist()
+            node_feature.extend(sentence_embedding)
+            node_feature.extend(doc_embedding)
+
+            node_features.append(node_feature)
+
+        feature_graph = create_graph_with_features(graph, list(graph.nodes()), node_features)
+        sg_graph = networkx_to_stellargraph(feature_graph)
+
+        sg_words, sg_embeddings = graph_sage_embeddings(sg_graph)
+
+        graph_revised = create_networkx_graph(sg_words, sg_embeddings, similarity_threshold=sim)
+
+        components_all = apxa.k_components(graph_revised)
+
+        for k_component in [1, 2, 3]:
+
+            print("k_component: " + str(k_component))
+            components = components_all[k_component]
+
+            corpus_clusters = []
+            for comp in components:
+                if len(comp) >= 6:
+                    corpus_clusters.append(comp)
+
+            cluster_words = [sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_weights)),
+                                    reverse=True) for c in corpus_clusters]
+
+            if len(cluster_words) <= 2:
+                cs_c_v = -1000.0
+                dbs = -1000.0
+                cs_npmi = -1000.0
+            else:
+                cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
+                                      for words in cluster_words]
+
+                cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, cluster_words, cs_type='c_v')))
+                dbs = float("{:.2f}".format(davies_bouldin_index(cluster_embeddings)))
+                cs_npmi = float("{:.2f}".format(average_npmi_topics(all_data_processed, cluster_words,
+                                                                    len(cluster_words))))
+
+            y_c_v_clustering_type[k_component].append(cs_c_v)
+            y_npmi_clustering_type[k_component].append(cs_npmi)
+            y_dbs_clustering_type[k_component].append(dbs)
+
+            y_topics[k_component].append(cluster_words)
+
+    # c_v coherence score
+    ys = [l for l in y_c_v_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
+    fig.savefig("visuals/sage_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score
+    ys = [l for l in y_npmi_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="NPMI",
+                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
+    fig.savefig("visuals/sage_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # dbs score
+    ys = [l for l in y_dbs_clustering_type.values()]
+    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
+                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
+    fig.savefig("visuals/sage_dbi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    for m in list(y_topics.keys()):
+        vis_topics_score(y_topics[m], y_c_v_clustering_type[m], y_npmi_clustering_type[m],
+                         "visuals/graph_clusters_eval_" + str(m) + ".txt", dbs_scores=y_dbs_clustering_type[m])
 
 
 """
@@ -229,8 +408,6 @@ def get_w2v_vis_topic_vec(all_data_processed: list, vocab: list, tokenized_docs:
     # "negative": w2v_model.negative, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42, 'cbow_mean': 1}
 
     # words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
-
-
 
 
 

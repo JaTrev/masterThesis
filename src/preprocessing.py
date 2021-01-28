@@ -54,30 +54,32 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
 
         tkns = word_tokenize(doc)
 
-        # remove all tokens that are <= 3
+        tkns = [w for w in tkns if w not in ['gon', 'na']]
+
+        # remove all tokens that are < 3
         tkns = [w for w in tkns if len(w) > 2]
 
         # remove all tokens that are just digits
         tkns = [w for w in tkns if w.isalpha()]
 
+        tokenized_doc = [w for w in tkns]
+
         # remove stop words before stemming/lemmatizing
         if do_stop_word_removal:
-            doc_tkns = [w for w in tkns if w not in stop_words]
+            tkns = [w for w in tkns if w not in stop_words]
         else:
-            doc_tkns = [w for w in tkns]
+            tkns = [w for w in tkns]
 
         # remove all words that are not nouns
-        tkns = [w for (w, pos) in nltk.pos_tag(doc_tkns) if pos in ['NN', 'NNP', 'NNS', 'NNPS']]
+        tkns = [w for (w, pos) in nltk.pos_tag(tkns) if pos in ['NN', 'NNP', 'NNS', 'NNPS']]
 
         # stemming
         if do_stemming:
             tkns = [PorterStemmer().stem(w) for w in tkns]
-            doc_tkns = [PorterStemmer().stem(w) for w in doc_tkns]
 
         # lemmatizing
         if do_lemmatizing:
             tkns = [WordNetLemmatizer().lemmatize(w) for w in tkns]
-            doc_tkns = [WordNetLemmatizer().lemmatize(w) for w in doc_tkns]
 
         if len(tkns) == 0:
             continue
@@ -85,7 +87,7 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
         new_docs.append(tkns)
         new_labels.append(docs_label[i])
         vocabulary.extend(tkns)
-        tokenized_docs.append(doc_tkns)
+        tokenized_docs.append(tokenized_doc)
 
     if remove_low_freq:
         # remove low-frequency terms
@@ -99,20 +101,20 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
 
         docs_threshold = []
         vocab_threshold = []
-        tokenized_docs_threshold = []
+        # tokenized_docs_threshold = []
         for i_d, d in enumerate(new_docs):
 
             d_threshold = [w for w in d if counter[w] > l_threshold]
             if len(d_threshold) > 0:
                 docs_threshold.append(d_threshold)
                 vocab_threshold.extend(d_threshold)
-                tokenized_docs_threshold.append(tokenized_docs[i_d])
+                # tokenized_docs_threshold.append(tokenized_docs[i_d])
 
         print("vocab threshold len: " + str(len(vocab_threshold)))
         print("vocab withouth threshold len: " + str(len(vocabulary)))
         new_docs = docs_threshold
         vocabulary = vocab_threshold
-        tokenized_docs = tokenized_docs_threshold
+        # tokenized_docs = tokenized_docs_threshold
 
     assert len(new_docs) == len(new_labels)
     return new_docs, new_labels, sorted(list(set(vocabulary))), tokenized_docs

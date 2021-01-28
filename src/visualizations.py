@@ -321,7 +321,7 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
         all_y = []
         for y in ys:
             all_y.extend(y)
-        y_ticks = [x/10 for x in range(10, 40, 5)]
+        y_ticks = [x/10 for x in range(00, 40, 5)]
     else:
         assert type in ["ari", "ami", "acc"]
         y_ticks = [x / 10 for x in range(0, 7, 1)]
