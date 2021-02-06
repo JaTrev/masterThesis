@@ -1,5 +1,6 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.font_manager
 from matplotlib.lines import Line2D
 import networkx as nx
 import numpy as np

@@ -81,7 +81,7 @@ def get_word_vectors(processed_data: list, vocab: list, saved_model=None, params
     # vocab_words and vocab_embeddings are sorted like vocab
     vocab_words = [w for w in vocab if w in w2v_model.wv.index2word]
     vocab_embeddings = [w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)]
-                        for w in vocab if w in w2v_model.wv.index2word]
+                        for w in vocab_words]
 
     return vocab_words, vocab_embeddings, w2v_model
 
@@ -102,7 +102,6 @@ def get_avg_sentence_doc_embeddings_w2v(original_data: list, nodes: list, vocab:
 
         for sent in sents:
             sent_words = sent.lower().split()
-
 
             sent_embedds_list = [vocab_embeddings[vocab.index(w)] for w in sent_words if w in vocab]
 
@@ -278,13 +277,14 @@ def get_pretrained_fast_text_embeddings(vocab: list):
     return new_vocab, vocab_embeddings
 
 
-def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, embedding_type: str, params=None):
+def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, embedding_type: str, params=None, saved_model=None):
     assert len(processed_data) == len(data_labels)
 
     doc_embeddings = []
 
     if embedding_type == "w2v_avg":
-        vocab_words, vocab_embeddings, _ = get_word_vectors(processed_data=processed_data, vocab=vocab, params=params)
+        vocab_words, vocab_embeddings, _ = get_word_vectors(processed_data=processed_data, vocab=vocab,
+                                                            saved_model=saved_model,  params=params)
 
         doc_data = []
         doc_labels = []
@@ -416,21 +416,19 @@ def get_avg_sentence_doc_embeddings_w2v_2(original_data: list, nodes: list, voca
 
 def get_doc2vec_embeddings(processed_data: list, vocab: list, min_c: int, win: int, negative: int, hs: int,
                            seed: int, sample: float = 6e-5, alpha: float = 0.03, min_alpha: float = 0.0007,
-                           epochs: int = 30, size: int = 300, ns_exponent: float = 0.75):
+                           epochs: int = 30, size: int = 300, ns_exponent: float = 0.75, dm=1, dbow_words=0):
 
     documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(processed_data)]
     d2v_model = Doc2Vec(documents, min_count=min_c, window=win, vector_size=size, sample=sample, alpha=alpha,
                         min_alpha=min_alpha, negative=negative, ns_exponent=ns_exponent, seed=seed, compute_loss=True,
-                        workers=1, epochs=epochs, sorted_vocab=1, hs=hs)
+                        workers=1, epochs=epochs, sorted_vocab=1, hs=hs, dm=dm, dbow_words=dbow_words)
 
     # normalize vectors:
     d2v_model.init_sims(replace=True)
 
     # vocab_words and vocab_embeddings are sorted like vocab
     vocab_words = [w for w in vocab if w in d2v_model.wv.index2word]
-    vocab_embeddings = [d2v_model.wv.vectors[d2v_model.wv.index2word.index(w)]
-                        for w in vocab_words]
-
+    vocab_embeddings = [d2v_model.wv.vectors[d2v_model.wv.index2word.index(w)] for w in vocab_words]
     doc_embeddings = [d2v_model.docvecs[i] for i in range(len(processed_data))]
 
     return vocab_words, vocab_embeddings, doc_embeddings, d2v_model

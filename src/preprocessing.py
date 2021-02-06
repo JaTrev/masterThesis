@@ -25,10 +25,10 @@ stop_words.extend(['car', 'like', 'got',
                    'look', 'see', 'good',
                    'quite', 'think', 'little',
                    'right', 'know', 'thing', 'want'])
-stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'car', 'like', 'got', 'get', 'one', 'well',
+stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'like', 'got', 'get', 'one', 'well',
                    'back', 'bit', 'drive', 'look', 'see', 'good', 'quite', 'think', 'little', 'right', 'know',
                    'thing', 'want', 'dhe', 'gon', 'let', 'get'])
-stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really"])
+stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really", "car", "cars"])
 
 
 def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_lemmatizing: bool = False,
@@ -54,7 +54,7 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
 
         tkns = word_tokenize(doc)
 
-        tkns = [w for w in tkns if w not in ['gon', 'na']]
+        # tkns = [w for w in tkns if w not in ['gon', 'na']]
 
         # remove all tokens that are < 3
         tkns = [w for w in tkns if len(w) > 2]
@@ -101,20 +101,17 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
 
         docs_threshold = []
         vocab_threshold = []
-        # tokenized_docs_threshold = []
         for i_d, d in enumerate(new_docs):
 
             d_threshold = [w for w in d if counter[w] > l_threshold]
             if len(d_threshold) > 0:
                 docs_threshold.append(d_threshold)
                 vocab_threshold.extend(d_threshold)
-                # tokenized_docs_threshold.append(tokenized_docs[i_d])
 
         print("vocab threshold len: " + str(len(vocab_threshold)))
         print("vocab withouth threshold len: " + str(len(vocabulary)))
         new_docs = docs_threshold
         vocabulary = vocab_threshold
-        # tokenized_docs = tokenized_docs_threshold
 
     assert len(new_docs) == len(new_labels)
     return new_docs, new_labels, sorted(list(set(vocabulary))), tokenized_docs

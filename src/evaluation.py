@@ -117,7 +117,6 @@ def average_npmi_topics(documents, topic_words_large, ntopics,):
         all_topics.append(np.mean(topic_score))
 
     avg_score = np.around(np.mean(all_topics), 5)
-    print(f"\nAverage NPMI for {ntopics} topics: {avg_score}")
 
     return avg_score
 

@@ -1,5 +1,6 @@
 from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering, DBSCAN
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import pairwise_distances
 from src.misc import *
 import numpy as np
 from sklearn.decomposition import NMF
@@ -242,10 +243,10 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
         'spectral': spectral_clustering
     }
 
-    print("Performing weighted clustering!")
-
-    doc_weights_dict = get_doc_weights(doc_data, vocab, weight_type=clustering_weight_type)
-    doc_weights = [doc_weights_dict[doc] for doc in doc_names]
+    # print("Performing weighted clustering!")
+    # doc_weights_dict = get_doc_weights(doc_data, vocab, weight_type=clustering_weight_type)
+    # doc_weights = [doc_weights_dict[doc] for doc in doc_names]
+    doc_weights = None
 
     # cluster words to cluster labels
     labels = clustering_dict[clustering_type](doc_embeddings, doc_weights, params)
