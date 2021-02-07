@@ -87,9 +87,19 @@ def number_of_words_per_doc():
     fig.savefig("visuals/segment_word_distribution.pdf", bbox_inches='tight', transparent=True)
 
 
-def vis_most_common_words(data: list):
-    # if corpus == None:
-    #    corpus = [doc.split() for doc in all_data]
+def vis_most_common_words(data: list, raw_data: False, preprocessed: False):
+    if raw_data:
+        data = [doc.split() for doc in data]
+        y_max = 25000
+        filename = "most_common_words"
+    else:
+        if preprocessed:
+
+            y_max = 1000
+        else:
+
+            y_max = 4000
+        filename = "processed_most_common_words"
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -121,7 +131,7 @@ def vis_most_common_words(data: list):
 
     plt.bar(most_common_words, most_common_words_c, color='black', width=0.5)
 
-    plt.ylim(top=1000)
+    plt.ylim(top=y_max)
     plt.ylim(bottom=0)
 
     ax.set_xlabel("Top 30 Words", fontsize="medium")
@@ -129,7 +139,7 @@ def vis_most_common_words(data: list):
 
     plt.setp(ax.xaxis.get_majorticklabels(), rotation=-45, ha="left", rotation_mode="anchor")
 
-    fig.savefig("visuals/processed_most_common_words.pdf", bbox_inches='tight', transparent=True)
+    fig.savefig("visuals/" + str(filename) + ".pdf", bbox_inches='tight', transparent=True)
 
 
 
@@ -479,10 +489,14 @@ def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
 
 
 if __name__ == "__main__":
-    all_data_processed, all_data_labels, vocab, tokenized_docs = preprocessing(new_data,
-                                                                               new_data_label,
-                                                                               do_lemmatizing=True,
-                                                                               do_stop_word_removal=True)
+
+    data = all_data
+    data_labels = all_data_label
+    assert len(data) == len(data_labels)
+
+    data_processed, data_labels, vocab, tokenized_docs = preprocessing(data, data_labels,
+                                                                       do_lemmatizing=True,
+                                                                       do_stop_word_removal=True)
     #####
     # document space
     ####
@@ -496,11 +510,12 @@ if __name__ == "__main__":
     # get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
     # get_graph_components(all_data_processed, vocab, tokenized_docs)
     # get_sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
+    # bert_visualization(all_data_processed, vocab, tokenized_docs)
 
     ####
     # word + doc space
     ####
-    w_d_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="doc2vec")
+    # w_d_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="doc2vec")
     # test_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     # doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
@@ -513,7 +528,7 @@ if __name__ == "__main__":
     # Misc
     ####
     # number_of_words_per_doc()
-    # vis_most_common_words(all_data_processed)
+    vis_most_common_words(data_processed, raw_data=False, preprocessed=True)
 
 
 

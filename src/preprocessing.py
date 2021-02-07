@@ -19,7 +19,7 @@ stop_words = sw + en_stop
 stop_words.append('let')
 stop_words.append('gon')
 stop_words.append('dhe')
-stop_words.extend(['car', 'like', 'got',
+stop_words.extend(['like', 'got',
                    'get', 'one', 'well',
                    'back', 'bit', 'drive',
                    'look', 'see', 'good',

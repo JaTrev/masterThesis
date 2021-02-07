@@ -330,7 +330,7 @@ def calculate_bert_vocab_embeddings(input_ids: list, embeddings: list, vocab: li
 
         # go through the entire sentence (all tokens)
         i = 0
-        while i < 256:
+        while i < 512:
 
             w_id = int(sent_ids[i].item())
             if w_id == 101:
@@ -344,32 +344,29 @@ def calculate_bert_vocab_embeddings(input_ids: list, embeddings: list, vocab: li
             # check if word is in the vocabulary
             word = tokenizer.ids_to_tokens[w_id]
 
-            if get_cls_token:
-                w_embedding_list = [embeddings[sent_index].cpu().detach().numpy()]
-            else:
-                w_embedding_list = [embeddings[sent_index][i].cpu().detach().numpy()]
-            # get all subwords
-            while i < 255 and tokenizer.ids_to_tokens[sent_ids[i + 1].item()][:2] == "##":
-                word = word + tokenizer.ids_to_tokens[sent_ids[i + 1].item()][2:]
+            if word in vocab:
 
                 if get_cls_token:
-                    w_embedding_list.append(embeddings[sent_index].cpu().detach().numpy())
+                    w_embedding_list = [embeddings[sent_index].cpu().detach().numpy()]
                 else:
-                    w_embedding_list.append(embeddings[sent_index][i+1].cpu().detach().numpy())
-                i += 1
+                    w_embedding_list = [embeddings[sent_index][i].cpu().detach().numpy()]
 
-            if word in vocab:
+                    # get all subwords
+                    while i < 511 and tokenizer.ids_to_tokens[sent_ids[i + 1].item()][:2] == "##":
+
+                        word = word + tokenizer.ids_to_tokens[sent_ids[i + 1].item()][2:]
+                        w_embedding_list.append(embeddings[sent_index][i + 1].cpu().detach().numpy())
+                        i += 1
 
                 if len(w_embedding_list) > 1:
                     # average over all substring embeddings
                     word_embedding = np.average(w_embedding_list, axis=0)
                 else:
-                    # must be 1 in the list
+                    assert len(w_embedding_list) == 0
                     word_embedding = w_embedding_list[0]
 
                 if word in vocab_emb_dict:
                     vocab_emb_dict[word].append(word_embedding)
-
                 else:
                     vocab_emb_dict[word] = [word_embedding]
             i += 1
