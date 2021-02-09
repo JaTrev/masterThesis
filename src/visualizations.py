@@ -7,6 +7,8 @@ import numpy as np
 from math import sqrt
 from sklearn.manifold import TSNE
 from src.evaluation import *
+import os
+import numpy as np
 
 
 def vis_classification_score(model_type: str, doc_labels_true: list, doc_topics_pred: list, topics: list,
@@ -25,6 +27,51 @@ def vis_classification_score(model_type: str, doc_labels_true: list, doc_topics_
             myFile.write('\n')
         myFile.write("ari score: " + ": " + str(ari_score(doc_labels_true, doc_topics_pred)) + '\n')
         myFile.write("ami score: " + ": " + str(ami_score(doc_labels_true, doc_topics_pred)) + '\n')
+
+
+def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name: str):
+
+    assert len(doc_labels_true) == len(doc_topics_pred), "labels must have same length"
+
+    labels_true = np.array(doc_labels_true)
+    labels_predicted = np.array(doc_topics_pred)
+
+    parent_dir = "visuals/" + model_name + "_dir"
+    os.mkdir(parent_dir)
+
+    topics = set(doc_topics_pred)
+    assert -1 not in topics
+
+    for t in range(max(topics)):
+        predicted_indices = np.argwhere(labels_predicted == t)
+
+        # t_predicted = np.take(labels_predicted, predicted_indices)
+        t_true = labels_true[predicted_indices].flatten()
+
+        fig, ax = vis_prep()
+
+        ax.set_xlabel("True Topic " + str(t), fontsize='medium', labelpad=4)
+        ax.set_ylabel("Number of Segments", fontsize='medium', labelpad=4)
+        ax.tick_params(axis='both', labelsize='small')
+        plt.setp(ax.spines.values(), linewidth=2)
+        plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
+
+        labels, values = zip(*Counter(t_true).items())
+
+        values = list(values)
+        max_values = int(max(values)/20)*20 + 40
+
+        #indexes = np.arange(len(labels))
+        #width = 1
+        #plt.bar(indexes, values, width, color="grey")
+        #plt.xticks(indexes + width * 0.5, list(set(t_true)))
+
+        bins = np.arange(len(set(t_true))) - 0.5
+        plt.hist(t_true, bins, color='#666666', ec="white")
+        plt.xticks(range(len(set(t_true))))
+        ax.yaxis.set_ticks(list(range(0, max_values, 20)))
+
+        fig.savefig(parent_dir + "/topic" + str(t) + ".pdf", bbox_inches='tight', transparent=True)
 
 
 def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, filename: str, dbs_scores: list = None,

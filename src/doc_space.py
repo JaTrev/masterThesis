@@ -53,6 +53,8 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
                 vis_classification_score(m, doc_labels_true, doc_topics_pred, topics,
                                      "visuals/classification_scores_" + str(m) + ".txt")
 
+                label_distribution(doc_labels_true, doc_topics_pred, m)
+
     # c_v coherence score
     ys = [l for l in y_c_v_model.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",

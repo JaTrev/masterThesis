@@ -22,7 +22,6 @@ def lsa_topics(processed_data: list, n_topics: int = 10, n_words: int = 10):
 
 def lda_topics(processed_data: list, n_topics: int = 10, learning_decay: float = 0.5,
                learning_offset: float = 1.0, max_iter: int = 50, n_words: int = 10):
-    # TODO: add tf-idf
 
     dictionary = corpora.Dictionary(processed_data, )
     doc_term_matrix = [dictionary.doc2bow(doc) for doc in processed_data]
@@ -90,9 +89,10 @@ def nmf_topics(preprocessed_data: list, vocabulary: list, n_topics: int = 10,
                     max_iter=1000, alpha=.1, l1_ratio=.5, random_state=42)
 
     w = nmf_model.fit_transform(new_data)
+    h = nmf_model.components_
 
     topics = []
-    for topic_idx, topic in enumerate(nmf_model.components_):
+    for topic_idx, topic in enumerate(h):
         top_features = [feature_names[i] for i in topic.argsort()[:-n_words - 1:-1]]
         topics.append(top_features)
 

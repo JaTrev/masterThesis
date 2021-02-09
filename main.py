@@ -490,8 +490,8 @@ def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
 
 if __name__ == "__main__":
 
-    data = all_data
-    data_labels = all_data_label
+    data = new_data
+    data_labels = new_data_label
     assert len(data) == len(data_labels)
 
     data_processed, data_labels, vocab, tokenized_docs = preprocessing(data, data_labels,
@@ -500,7 +500,7 @@ if __name__ == "__main__":
     #####
     # document space
     ####
-    # get_baseline(all_data_processed, vocab, tokenized_docs, all_data_labels)
+    get_baseline(data_processed, vocab, tokenized_docs, data_labels)
     # note used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     #####
@@ -528,7 +528,7 @@ if __name__ == "__main__":
     # Misc
     ####
     # number_of_words_per_doc()
-    vis_most_common_words(data_processed, raw_data=False, preprocessed=True)
+    # vis_most_common_words(data_processed, raw_data=False, preprocessed=True)
 
 
 
