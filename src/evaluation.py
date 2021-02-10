@@ -25,9 +25,22 @@ def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v
         return -1000
 
     dictionary = corpora.Dictionary(processed_data)
-    # corpus = [dictionary.doc2bow(text) for text in processed_data]
+    corpus = [dictionary.doc2bow(text) for text in processed_data]
 
-    cm = CoherenceModel(topics=[t[:10] for t in topic_words],
+    dictionary_words = dictionary.token2id
+    new_topics = []
+    for topic in topic_words:
+
+        temp_topic = []
+        for w in topic:
+            if w in dictionary_words:
+                temp_topic.append(w)
+
+            if len(temp_topic) == 10:
+                break
+        new_topics.append(temp_topic)
+
+    cm = CoherenceModel(topics=new_topics,
                         # corpus=corpus,
                         dictionary=dictionary,
                         texts=processed_data,

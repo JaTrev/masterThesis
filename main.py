@@ -39,13 +39,12 @@ for i, d in enumerate(test_data):
 print("removed test docs: " + str(len(test_data) - len(new_test_data)))
 
 
-all_data = [d for d in new_data]
-all_data.extend(new_test_data)
+# all_data = [d for d in new_data]
+# all_data.extend(new_test_data)
 
-all_data_label = [l for l in new_data_label]
-all_data_label.extend(new_test_data_label)
-
-assert len(all_data) == len(all_data_label)
+# all_data_label = [l for l in new_data_label]
+# all_data_label.extend(new_test_data_label)
+# assert len(all_data) == len(all_data_label)
 
 
 # TODO: create a main() function
@@ -490,18 +489,20 @@ def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
 
 if __name__ == "__main__":
 
-    data = new_data
-    data_labels = new_data_label
-    assert len(data) == len(data_labels)
+    do_lemmatizing = True
+    do_stop_word_removal = True
 
-    data_processed, data_labels, vocab, tokenized_docs = preprocessing(data, data_labels,
-                                                                       do_lemmatizing=True,
-                                                                       do_stop_word_removal=True)
+    data_processed, data_labels, vocab, tokenized_docs = preprocessing(
+        new_data, new_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
+
+    test_data_processed, test_data_labels, test_vocab, test_tokenized_docs = preprocessing(
+        new_test_data, new_test_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
+
     #####
     # document space
     ####
-    get_baseline(data_processed, vocab, tokenized_docs, data_labels)
-    # note used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
+    get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
+    # not used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     #####
     # word space

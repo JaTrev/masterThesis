@@ -45,12 +45,11 @@ def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name:
     for t in range(max(topics)):
         predicted_indices = np.argwhere(labels_predicted == t)
 
-        # t_predicted = np.take(labels_predicted, predicted_indices)
         t_true = labels_true[predicted_indices].flatten()
 
         fig, ax = vis_prep()
 
-        ax.set_xlabel("True Topic " + str(t), fontsize='medium', labelpad=4)
+        ax.set_xlabel("T$_{" + str(t) + "}$'s " + "True Topic Distribution", fontsize='medium', labelpad=4)
         ax.set_ylabel("Number of Segments", fontsize='medium', labelpad=4)
         ax.tick_params(axis='both', labelsize='small')
         plt.setp(ax.spines.values(), linewidth=2)
@@ -61,21 +60,21 @@ def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name:
         values = list(values)
         max_values = int(max(values)/20)*20 + 40
 
-        #indexes = np.arange(len(labels))
-        #width = 1
-        #plt.bar(indexes, values, width, color="grey")
-        #plt.xticks(indexes + width * 0.5, list(set(t_true)))
+        bins = np.arange(len(set(t_true))+1) - 0.5
 
-        bins = np.arange(len(set(t_true))) - 0.5
         plt.hist(t_true, bins, color='#666666', ec="white")
-        plt.xticks(range(len(set(t_true))))
+
+        plt.xticks(list(range(10)))
         ax.yaxis.set_ticks(list(range(0, max_values, 20)))
 
         fig.savefig(parent_dir + "/topic" + str(t) + ".pdf", bbox_inches='tight', transparent=True)
 
+        # close fig
+        plt.close(fig)
 
-def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, filename: str, dbs_scores: list = None,
-                     n_words: int = 10):
+
+def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, test_c_v_scores: list,
+                     test_nmpi_scores: list, filename: str, dbs_scores: list = None, n_words: int = 10):
     assert len(topics_list) == len(c_v_scores)
     assert len(c_v_scores) == len(nmpi_scores)
 
@@ -98,8 +97,13 @@ def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, fil
 
                 myFile.write('\n')
 
-            myFile.write("c_v score: " + ": " + str(c_v_scores[i]) + '\n')
-            myFile.write("nmpi score: " + ": " + str(nmpi_scores[i]) + '\n')
+            myFile.write("intrinsic evaluation" + '\n')
+            myFile.write("c_v score: " + str(c_v_scores[i]) + '\n')
+            myFile.write("nmpi score: " + str(nmpi_scores[i]) + '\n')
+
+            myFile.write("extrinsic evaluation" + '\n')
+            myFile.write("c_v score: " + str(test_c_v_scores[i]) + '\n')
+            myFile.write("nmpi score: " + str(test_nmpi_scores[i]) + '\n')
 
             if dbs_scores is not None:
                 myFile.write("dbs score: " + ": " + str(dbs_scores[i]) + '\n')
