@@ -316,9 +316,6 @@ def doc2vec_visualization(all_data_processed: list, vocab: list, tokenized_docs:
     fig.savefig("visuals/box_plot_d2v.pdf", dpi=100, transparent=True)
 
 
-
-
-
 def fast_text_visualization(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
@@ -501,13 +498,13 @@ if __name__ == "__main__":
     #####
     # document space
     ####
-    get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
+    # get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
     # not used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     #####
     # word space
     ####
-    # get_w2v_vis_sign_words(all_data_processed, vocab, tokenized_docs)
+    get_w2v_vis_sign_words(data_processed, vocab, tokenized_docs, test_tokenized_docs)
     # get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
     # get_graph_components(all_data_processed, vocab, tokenized_docs)
     # get_sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)

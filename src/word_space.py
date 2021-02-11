@@ -4,7 +4,8 @@ from src.clustering import *
 from src.graphs import *
 
 
-def get_w2v_vis_sign_words(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):
+def get_w2v_vis_sign_words(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
+                           x: list = None):
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
 
@@ -14,54 +15,48 @@ def get_w2v_vis_sign_words(all_data_processed: list, vocab: list, tokenized_docs
     else:
         assert isinstance(x, list)
 
-    # _, _, w2v_model = get_word_vectors(all_data_processed, vocab, "data/w2v_node2vec")
-    # w2v_model
-    # min_count: 50
-    # window: 3
-    # negative: 60
-    # ns_exponent: 0.75
-    # orig = w2v_model.min_count
-    # print(orig)
-    # w2v_params = {'min_c': k, 'win': w2v_model.window, 'negative': w2v_model.negative, 
-    # 'ns_exponent': w2v_model.ns_exponent, 'seed': 42}
-
-    w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    # w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
+                  'ns_exponent': 0.75}
 
     y_c_v_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
     y_dbs_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
     y_npmi_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
 
+    test_y_c_v_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
+    test_y_npmi_model = {"kmeans": [], "agglomerative": [], "hdbscan": []}
+
     y_topics = {'kmeans': [], 'agglomerative': [], 'hdbscan': []}
 
-    words, word_embeddings, _ = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+    words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
+
+    labels, probabilities = hdbscan_clustering(word_embeddings, min_cluster_size=6, do_dim_reduction=False)
+    temp_cluster_words = [[] for _ in range(len(set(labels)) - 1)]
+    temp_cluster_embeddings = [[] for _ in range(len(set(labels)) - 1)]
+    for i, label in enumerate(labels):
+
+        if label == -1:
+            # noise
+            continue
+        temp_cluster_words[label].append([words[i], probabilities[i]])
+        temp_cluster_embeddings[label].append(word_embeddings[i])
+
+    hdbscan_clusters_words = []
+    hdbscan_clusters_words_embeddings = []
+    for i_c, c in enumerate(temp_cluster_words):
+        c_sorted_indices = sorted(range(len(c)), key=lambda i_w: c[i_w][1], reverse=True)
+
+        hdbscan_clusters_words.append([c[i][0] for i in c_sorted_indices[:30]])
+        hdbscan_clusters_words_embeddings.append([temp_cluster_embeddings[i_c][i]
+                                          for i in c_sorted_indices[:30]])
 
     for k in x:
 
         for cluster_type in ["kmeans", "agglomerative", "hdbscan"]:
             
             if cluster_type == "hdbscan":
-
-                labels, probabilities = hdbscan_clustering(word_embeddings, min_cluster_size=6, do_dim_reduction=False)
-
-                temp_cluster_words = [[] for _ in range(len(set(labels)) - 1)]
-                temp_cluster_embeddings = [[] for _ in range(len(set(labels)) - 1)]
-                for i, label in enumerate(labels):
-
-                    if label == -1:
-                        # noise
-                        continue
-                    temp_cluster_words[label].append([words[i], probabilities[i]])
-                    temp_cluster_embeddings[label].append(word_embeddings[i])
-
-                clusters_words = []
-                clusters_words_embeddings = []
-                for i_c, c in enumerate(temp_cluster_words):
-                    
-                    c_sorted_indices = sorted(range(len(c)), key=lambda i_w: c[i_w][1], reverse=True)
-
-                    clusters_words.append([c[i][0] for i in c_sorted_indices[:10]])
-                    clusters_words_embeddings.append([temp_cluster_embeddings[i_c][i]
-                                                      for i in c_sorted_indices[:10]])
+                clusters_words = hdbscan_clusters_words
+                clusters_words_embeddings = hdbscan_clusters_words_embeddings
 
             else:
                 assert cluster_type in ["kmeans", "agglomerative"]
@@ -71,11 +66,15 @@ def get_w2v_vis_sign_words(all_data_processed: list, vocab: list, tokenized_docs
                     clustering_params = {'n_clusters': k}
     
                 clusters_words, clusters_words_embeddings = word_clusters(
-                    all_data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
+                    data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
                     params=clustering_params, clustering_weight_type=clustering_weight_type,
-                    ranking_weight_type=ranking_weight_type
+                    ranking_weight_type=ranking_weight_type,
                 )
 
+            print([len(c) for c in clusters_words])
+            y_topics[cluster_type].append(clusters_words)
+
+            # intrinsic
             cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, clusters_words, cs_type='c_v')))
             dbs = float("{:.2f}".format(davies_bouldin_index(clusters_words_embeddings)))
             cs_npmi = average_npmi_topics(tokenized_docs, clusters_words, len(clusters_words))
@@ -84,9 +83,14 @@ def get_w2v_vis_sign_words(all_data_processed: list, vocab: list, tokenized_docs
             y_npmi_model[cluster_type].append(cs_npmi)
             y_dbs_model[cluster_type].append(dbs)
 
-            y_topics[cluster_type].append(clusters_words)
+            # extrinsic
+            test_y_c_v_model[cluster_type].append(float("{:.2f}".format(coherence_score(test_tokenized_docs,
+                                                                                        clusters_words,
+                                                                                        cs_type='c_v'))))
+            test_y_npmi_model[cluster_type].append(average_npmi_topics(test_tokenized_docs, clusters_words,
+                                                                       len(clusters_words)))
 
-    # c_v coherence score
+    # c_v coherence score - intrinsic
     ys = [l for l in y_c_v_model.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
                           color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
@@ -98,12 +102,24 @@ def get_w2v_vis_sign_words(all_data_processed: list, vocab: list, tokenized_docs
                           color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
     fig.savefig("visuals/ws_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
 
+    # c_v coherence score - extrinsic
+    ys = [l for l in test_y_c_v_model.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
+    fig.savefig("visuals/ws_extrinsic_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score - extrinsic
+    ys = [l for l in test_y_npmi_model.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
+    fig.savefig("visuals/ws_extrinsic_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
     for m in list(y_topics.keys()):
         assert len(y_c_v_model[m]) == len(y_npmi_model[m])
         assert len(y_npmi_model[m]) == len(y_dbs_model[m])
         assert len(y_dbs_model[m]) == len(y_topics[m])
-        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], "visuals/ws_clusters_eval_" + str(m) + ".txt",
-                         dbs_scores=y_dbs_model[m])
+        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], test_y_c_v_model[m], test_y_npmi_model[m],
+                         "visuals/ws_clusters_eval_" + str(m) + ".txt", dbs_scores=y_dbs_model[m])
 
 
 def get_w2v_vis_topic_vec(all_data_processed: list, vocab: list, tokenized_docs: list, x: list = None):

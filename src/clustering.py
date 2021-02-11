@@ -121,7 +121,7 @@ def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: li
     sorted_cluster_words = []
     sorted_cluster_embeddings = []
     sorted_cluster_idxs = [sorted(range(len(c)),
-                                  key=lambda k: word_weights[c[k]] * cluster_similarities[i_c][k],
+                                  key=lambda k: word_weights[c[k]],  # * cluster_similarities[i_c][k]
                                   reverse=True)
                            for i_c, c in enumerate(cluster_words)]
 
