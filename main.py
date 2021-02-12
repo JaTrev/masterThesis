@@ -497,16 +497,16 @@ if __name__ == "__main__":
 
     #####
     # document space
-    ####
-    # get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
+    #####
+    get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
     # not used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     #####
     # word space
-    ####
-    get_w2v_vis_sign_words(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # get_w2v_vis_topic_vec(all_data_processed, vocab, tokenized_docs)
-    # get_graph_components(all_data_processed, vocab, tokenized_docs)
+    #####
+    # get_w2v_vis_sign_words(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+    # get_w2v_vis_topic_vec(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+    # get_graph_components(data_processed, vocab, tokenized_docs, test_tokenized_docs)
     # get_sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
     # bert_visualization(all_data_processed, vocab, tokenized_docs)
 
@@ -529,11 +529,7 @@ if __name__ == "__main__":
     # vis_most_common_words(data_processed, raw_data=False, preprocessed=True)
 
 
-
-
-
     # new_vocab, vocab_embeddings = get_fast_text_embeddings(vocab)
-
     # w2v_visualization(all_data_processed, vocab, tokenized_docs)
     # get_w2v_vis_sign_words(all_data_processed, vocab, tokenized_docs)
     # doc2vec_visualization(all_data_processed, vocab, tokenized_docs)

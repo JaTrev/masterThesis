@@ -42,14 +42,14 @@ def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name:
     topics = set(doc_topics_pred)
     assert -1 not in topics
 
-    for t in range(max(topics)):
+    for t in range(len(topics)):
         predicted_indices = np.argwhere(labels_predicted == t)
 
         t_true = labels_true[predicted_indices].flatten()
 
         fig, ax = vis_prep()
 
-        ax.set_xlabel("T$_{" + str(t) + "}$'s " + "True Topic Distribution", fontsize='medium', labelpad=4)
+        ax.set_xlabel("T$_{" + str(t+1) + "}$'s " + "True Topic Distribution", fontsize='medium', labelpad=4)
         ax.set_ylabel("Number of Segments", fontsize='medium', labelpad=4)
         ax.tick_params(axis='both', labelsize='small')
         plt.setp(ax.spines.values(), linewidth=2)
@@ -62,12 +62,18 @@ def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name:
 
         bins = np.arange(len(set(t_true))+1) - 0.5
 
-        plt.hist(t_true, bins, color='#666666', ec="white")
+        colors = ["#d14035", "#eb8a3c", "#ebb481", "#775845", "#31464f", "#86aa40", "#33655b", "#7ca2a1", "#B9EDF8",
+                  "#39BAE8"]
 
-        plt.xticks(list(range(10)))
+        t_true_list = [[l for l in t_true if i == l] for i in range(10)]
+
+        # plt.hist(t_true_list, ec="white") #      bins,    plt.hist(t_true_list, bins,   ec="white", rwidth=)
+        plt.bar(range(len(t_true_list)), height=[len(l) for l in t_true_list], width=0.8, color=colors[:len(t_true_list)])
+
+        plt.xticks(list(range(10)), list(range(1, 11)))
         ax.yaxis.set_ticks(list(range(0, max_values, 20)))
 
-        fig.savefig(parent_dir + "/topic" + str(t) + ".pdf", bbox_inches='tight', transparent=True)
+        fig.savefig(parent_dir + "/topic" + str(t+1) + ".pdf", bbox_inches='tight', transparent=True)
 
         # close fig
         plt.close(fig)
