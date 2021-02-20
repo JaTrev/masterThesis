@@ -43,24 +43,6 @@ def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, re
     if remove_isolated_nodes:
         graph.remove_nodes_from(list(nx.isolates(graph)))
 
-    """
-    edges_to_kill = []
-    for n, nbrs in graph.adj.items():
-
-        for nbr, eattr in nbrs.items():
-
-            # remove edges below a certain weight
-            n_weight = eattr['weight']
-            if n_weight < min_cutoff_value:
-                edges_to_kill.append((n, nbr))
-
-    for u, v in edges_to_kill:
-        if graph.has_edge(u, v):
-            graph.remove_edge(u, v)
-
-    if remove_isolated_nodes:
-        graph.remove_nodes_from(list(nx.isolates(graph)))
-    """
     return graph
 
 
@@ -98,26 +80,6 @@ def create_networkx_graph(words: list, word_embeddings: list, similarity_thresho
                 continue
             graph.add_edge(word_i, word_j, weight=float(sim))
             edge_weights.append(sim)
-
-    """
-    for i, word_i in enumerate(words):
-        for j, word_j in enumerate(words):
-
-            if word_i != word_j:
-                if not (graph.has_edge(word_j, word_i)):
-
-                    sim = cosine_similarity(word_embeddings[i].reshape(1, -1),
-                                            word_embeddings[j].reshape(1, -1))
-
-                    if sim < similarity_threshold:
-                        # similarity is not high enough
-                        continue
-
-                    weight = sim
-                    graph.add_edge(word_i, word_j, weight=float(weight))
-                    edge_weights.append(weight)
-                    n = n + 1
-    """
 
     return remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes)
 

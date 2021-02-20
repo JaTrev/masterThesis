@@ -486,8 +486,8 @@ def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
 
 if __name__ == "__main__":
 
-    do_lemmatizing = False
-    do_stop_word_removal = False
+    do_lemmatizing = True
+    do_stop_word_removal = True
 
     data_processed, data_labels, vocab, tokenized_docs = preprocessing(
         new_data, new_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)

@@ -132,7 +132,7 @@ def get_w2v_vis_topic_vec(data_processed: list, vocab: list, tokenized_docs: lis
     else:
         assert isinstance(x, list)
 
-    #w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    # w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
     w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
                   'ns_exponent': 0.75}
 
@@ -251,8 +251,7 @@ def get_graph_components(all_data_processed, vocab, tokenized_docs, test_tokeniz
     word_weights = get_word_weights(all_data_processed, vocab, n_words, weight_type='tf')
 
     w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
-    # w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
-    #              'ns_exponent': 0.75}
+
     vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, params=w2v_params)
 
     y_topics = {1: [], 2: [], 3: []}
@@ -263,11 +262,11 @@ def get_graph_components(all_data_processed, vocab, tokenized_docs, test_tokeniz
     test_y_c_v_clustering_type = {1: [], 2: [], 3: []}
     test_y_npmi_clustering_type = {1: [], 2: [], 3: []}
 
-    x = [x/100 for x in range(50, 100, 10)] + [.95]
+    x = [x for x in range(50, 100, 10)] + [95]
 
     for sim in x:
 
-        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=sim)
+        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=0.8, percentile_cutoff=sim)
 
         components_all = apxa.k_components(graph)
 
@@ -317,31 +316,31 @@ def get_graph_components(all_data_processed, vocab, tokenized_docs, test_tokeniz
 
     # c_v coherence score
     ys = [l for l in y_c_v_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (c_v)",
+    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (c_v)",
                           color_legends=["K=1", "K=2", "K=3"], type='c_v')
     fig.savefig("visuals/graph_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # npmi coherence score
     ys = [l for l in y_npmi_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Coherence Score (NMPI)",
+    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (NMPI)",
                           color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
     fig.savefig("visuals/graph_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # dbs score
     ys = [l for l in y_dbs_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Threshold", y_label="Davies–Bouldin index",
+    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Davies–Bouldin index",
                           color_legends=["K=1", "K=2", "K=3"], type='dbs')
     fig.savefig("visuals/graph_dbi_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # c_v coherence score - extrinsic
     ys = [l for l in test_y_c_v_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (c_v)",
                           color_legends=["K=1", "K=2", "K=3"], type='c_v')
     fig.savefig("visuals/extrinsic_graph_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # u_mass coherence score - extrinsic
     ys = [l for l in test_y_npmi_clustering_type.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (NMPI)",
                           color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
     fig.savefig("visuals/extrinsic_graph_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
 
