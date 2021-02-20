@@ -486,8 +486,8 @@ def karate_club(original_data, all_data_processed, vocab, tokenized_docs):
 
 if __name__ == "__main__":
 
-    do_lemmatizing = True
-    do_stop_word_removal = True
+    do_lemmatizing = False
+    do_stop_word_removal = False
 
     data_processed, data_labels, vocab, tokenized_docs = preprocessing(
         new_data, new_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
@@ -498,7 +498,7 @@ if __name__ == "__main__":
     #####
     # document space
     #####
-    get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
+    # get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
     # not used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     #####
@@ -506,14 +506,14 @@ if __name__ == "__main__":
     #####
     # get_w2v_vis_sign_words(data_processed, vocab, tokenized_docs, test_tokenized_docs)
     # get_w2v_vis_topic_vec(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # get_graph_components(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+    get_graph_components(data_processed, vocab, tokenized_docs, test_tokenized_docs)
     # get_sage_graph_k_components(all_data, all_data_processed, vocab, tokenized_docs)
-    # bert_visualization(all_data_processed, vocab, tokenized_docs)
+    # bert_visualization(data_processed, vocab, test_tokenized_docs)
 
     ####
     # word + doc space
     ####
-    # w_d_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="doc2vec")
+    #w_d_clustering(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs, doc_embedding_type="doc2vec")
     # test_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     # doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")

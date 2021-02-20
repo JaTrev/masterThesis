@@ -9,7 +9,7 @@ from sklearn.preprocessing import normalize
 
 
 def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, doc_labels_true: list,
-                   doc_embedding_type="w2v_avg", x: list = None):
+                   test_tokenized_docs: list, doc_embedding_type="w2v_avg", x: list = None):
 
     # main extrinsic evaluation metric: ARI
     # https://stats.stackexchange.com/questions/381223/evaluation-of-clustering-method
@@ -23,15 +23,15 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
     else:
         assert isinstance(x, list)
 
-    min_cluster_size = 7
     if doc_embedding_type in ["w2v_avg", "w2v_sum"]:
-        params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1,
-                      'seed': 42, 'ns_exponent': 0.75}
-        min_cluster_size = 7
+        params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
+                  'ns_exponent': 0.75}
+        min_cluster_size = 7 #fully preprocesse: 9
 
-    elif doc_embedding_type == "doc2vec":
+    else:
+        assert doc_embedding_type == "doc2vec"
         params = {"min_c": 10, "win": 5, "negative": 30, "sample": 1e-5, "hs": 0, "epochs": 400, 'seed': 42,
-                      'ns_exponent': 0.75, "dm": 0, "dbow_words": 1}
+                  'ns_exponent': 0.75, "dm": 0, "dbow_words": 1}
         min_cluster_size = 8
 
     doc_data, short_true_labels, doc_embeddings, vocab_words, vocab_embeddings = get_doc_embeddings(
@@ -40,6 +40,9 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
     y_topics = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
     y_c_v_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
     y_npmi_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
+
+    test_y_c_v_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
+    test_y_npmi_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
 
     labels, probabilities = hdbscan_clustering(doc_embeddings, min_cluster_size=min_cluster_size, do_dim_reduction=False)
 
@@ -105,9 +108,17 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
             y_npmi_model[cluster_type].append(cs_npmi)
             y_topics[cluster_type].append(topics_words)
 
+            # extrinsic
+            test_y_c_v_model[cluster_type].append(float("{:.2f}".format(coherence_score(test_tokenized_docs,
+                                                                                        topics_words, cs_type='c_v'))))
+            test_y_npmi_model[cluster_type].append(average_npmi_topics(test_tokenized_docs, topics_words,
+                                                                       len(topics_words)))
+
             if k == true_topic_amount:
                 vis_classification_score(cluster_type, true_labels, labels_predict, topics_words,
                                          "visuals/w_d_space_classification_scores_" + str(cluster_type) + ".txt")
+                label_distribution(true_labels, labels_predict, cluster_type)
+
     # c_v coherence score
     ys = [l for l in y_c_v_model.values()]
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
@@ -119,9 +130,25 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
     _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (npmi)",
                           color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
     fig.savefig("visuals/w_d_space_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+    plt.close(fig)
+
+    # extrinsic
+    # c_v coherence score
+    ys = [l for l in test_y_c_v_model.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
+    fig.savefig("visuals/extrinsic_w_d_space_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+    plt.close(fig)
+
+    # NMPI coherence score
+    ys = [l for l in test_y_npmi_model.values()]
+    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
+    fig.savefig("visuals/extrinsic_w_d_space_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+    plt.close(fig)
 
     for m in list(y_topics.keys()):
-        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m],
+        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], test_y_c_v_model[m], test_y_npmi_model[m],
                          "visuals/w_d_space_clusters_eval_" + str(m) + ".txt")
 
 
