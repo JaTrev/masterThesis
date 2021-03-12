@@ -1,9 +1,8 @@
 from gensim.models.coherencemodel import CoherenceModel
 from gensim import corpora
 import sklearn.metrics
-from sklearn.metrics import adjusted_rand_score, accuracy_score, adjusted_mutual_info_score
-from scipy.spatial import distance
-from collections import Counter
+from sklearn.metrics import adjusted_rand_score, accuracy_score, adjusted_mutual_info_score, \
+    normalized_mutual_info_score
 import numpy as np
 
 
@@ -165,7 +164,11 @@ def acc_score(labels_true, labels_pred, normalize=True, sample_weight=None):
 
 
 def ami_score(labels_true, labels_pred, average_method='arithmetic'):
-    return adjusted_mutual_info_score(labels_true, labels_pred, average_method)
+    return adjusted_mutual_info_score(labels_true, labels_pred, average_method=average_method)
+
+
+def nmi_score(labels_true, labels_pred, average_method='arithmetic'):
+    return normalized_mutual_info_score(labels_true, labels_pred, average_method=average_method)
 
 
 def compute_aic_bic(data_matrix, labels) -> (float, float):

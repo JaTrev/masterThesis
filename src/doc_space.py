@@ -22,6 +22,7 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
     test_y_c_v_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
     test_y_npmi_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
 
+    doc_topics_pred_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
     for k in x:
 
         for m in list(y_topics.keys()):
@@ -41,6 +42,7 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
                 print(str(m) + "not in :" + str(y_topics.keys()))
                 return
 
+            # topic evaluation
             cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, topics, cs_type='c_v')))
             cs_npmi = average_npmi_topics(tokenized_docs, topics, len(topics))
 
@@ -53,10 +55,10 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
 
             y_topics[m].append(topics)
 
-            if k == true_topic_amount:
-                vis_classification_score(m, doc_labels_true, doc_topics_pred, topics, "visuals/classification_scores_"
-                                         + str(m) + ".txt")
+            # save predicted topics assigned for classification evaluation
+            doc_topics_pred_model[m].append(doc_topics_pred)
 
+            if k == true_topic_amount:
                 label_distribution(doc_labels_true, doc_topics_pred, m)
 
     # intrinsic
@@ -97,3 +99,6 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
         vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], test_y_c_v_model[m], test_y_npmi_model[m],
                          "visuals/clusters_eval_" + str(m) + ".txt")
 
+        vis_classification_score(y_topics[m], m, doc_labels_true, doc_topics_pred_model[m],
+                                 filename="visuals/classification_scores_" + str(m) + ".txt",
+                                 multiple_true_label_set=True)

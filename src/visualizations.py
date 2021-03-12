@@ -3,30 +3,49 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager
 from matplotlib.lines import Line2D
 import networkx as nx
-import numpy as np
 from math import sqrt
 from sklearn.manifold import TSNE
 from src.evaluation import *
 import os
 import numpy as np
+from collections import Counter
 
 
-def vis_classification_score(model_type: str, doc_labels_true: list, doc_topics_pred: list, topics: list,
-                             filename):
+def vis_classification_score(topics_list: list, model_type: str, doc_labels_true: list, doc_topics_pred_list: list,
+                             filename, n_words=10, multiple_true_label_set=False):
     # filename = "visuals/classification_scores.txt"
+
+    if any([len(t) > n_words for topics in topics_list for t in topics]):
+        new_topics_list = [[t[:10] for t in topics] for topics in topics_list]
+        topics_list = new_topics_list
 
     with open(filename, "w") as myFile:
         myFile.write('Model:  ' + str(model_type) + '\n')
 
-        for i_t, topic in enumerate(topics):
-            myFile.write('Topic ' + str(i_t + 1) + '\n')
+        for i, topics in enumerate(topics_list):
 
-            for w in topic:
-                myFile.write(str(w) + ' ')
+            for i_t, t in enumerate(topics):
+                myFile.write('Topic ' + str(i_t + 1) + '\n')
+
+                for w in t:
+                    myFile.write(str(w) + ' ')
+
+                myFile.write('\n')
 
             myFile.write('\n')
-        myFile.write("ari score: " + ": " + str(ari_score(doc_labels_true, doc_topics_pred)) + '\n')
-        myFile.write("ami score: " + ": " + str(ami_score(doc_labels_true, doc_topics_pred)) + '\n')
+
+            if multiple_true_label_set:
+                true_labels = doc_labels_true[i]
+
+            else:
+                true_labels = doc_labels_true
+            myFile.write("ari score: " + ": " + str(ari_score(true_labels, doc_topics_pred_list[i])) + '\n')
+            myFile.write("ami score: " + ": " + str(ami_score(true_labels, doc_topics_pred_list[i])) + '\n')
+            myFile.write("nmi score: " + ": " + str(nmi_score(true_labels, doc_topics_pred_list[i])) + '\n')
+
+            myFile.write('\n\n\n')
+
+    myFile.close()
 
 
 def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name: str):
@@ -115,6 +134,8 @@ def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, tes
                 myFile.write("dbs score: " + ": " + str(dbs_scores[i]) + '\n')
 
             myFile.write('\n\n\n')
+
+    myFile.close()
 
 
 def vis_prep():

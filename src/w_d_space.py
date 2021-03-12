@@ -9,12 +9,12 @@ from sklearn.preprocessing import normalize
 
 
 def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, doc_labels_true: list,
-                   test_tokenized_docs: list, doc_embedding_type="w2v_avg", x: list = None):
+                   test_tokenized_docs: list, doc_embedding_type="w2v_avg", x: list = None, true_topic_amount=10):
 
     # main extrinsic evaluation metric: ARI
     # https://stats.stackexchange.com/questions/381223/evaluation-of-clustering-method
 
-    true_topic_amount = len(set(doc_labels_true))
+    # true_topic_amount = len(set(doc_labels_true))
 
     if x is None:
         x = list(range(2, 22, 2))
@@ -26,7 +26,7 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
     if doc_embedding_type in ["w2v_avg", "w2v_sum"]:
         params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
                   'ns_exponent': 0.75}
-        min_cluster_size = 7 #fully preprocesse: 9
+        min_cluster_size = 7  # fully preprocessed: 9, just nouns: 7
 
     else:
         assert doc_embedding_type == "doc2vec"
@@ -43,6 +43,9 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
 
     test_y_c_v_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
     test_y_npmi_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
+
+    doc_topics_pred_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
+    doc_topics_true_model = {"kmeans": [], "agglomerative": [], "HDBSCAN": []}
 
     labels, probabilities = hdbscan_clustering(doc_embeddings, min_cluster_size=min_cluster_size, do_dim_reduction=False)
 
@@ -115,9 +118,11 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
                                                                        len(topics_words)))
 
             if k == true_topic_amount:
-                vis_classification_score(cluster_type, true_labels, labels_predict, topics_words,
-                                         "visuals/w_d_space_classification_scores_" + str(cluster_type) + ".txt")
                 label_distribution(true_labels, labels_predict, cluster_type)
+
+            # save predicted topics assigned for classification evaluation
+            doc_topics_pred_model[cluster_type].append(labels_predict)
+            doc_topics_true_model[cluster_type].append(true_labels)
 
     # c_v coherence score
     ys = [l for l in y_c_v_model.values()]
@@ -150,6 +155,10 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
     for m in list(y_topics.keys()):
         vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], test_y_c_v_model[m], test_y_npmi_model[m],
                          "visuals/w_d_space_clusters_eval_" + str(m) + ".txt")
+
+        vis_classification_score(y_topics[m], m, doc_topics_true_model[m], doc_topics_pred_model[m],
+                                 filename="visuals/classification_scores_" + str(m) + ".txt",
+                                 multiple_true_label_set=True)
 
 
 def test_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, doc_labels_true: list,
