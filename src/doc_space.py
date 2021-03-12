@@ -1,8 +1,5 @@
 from src.model import *
-from src.evaluation import *
 from src.visualizations import *
-from src.vectorization import *
-from src.clustering import *
 
 
 def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, doc_labels_true: list,

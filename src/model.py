@@ -1,9 +1,8 @@
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from gensim.models import LsiModel, LdaModel
 from gensim import corpora
-from gensim.models.wrappers import LdaMallet
 from sklearn.decomposition import NMF
-import numpy as np
+
 
 
 def lsa_topics(processed_data: list, n_topics: int = 10, n_words: int = 10):
@@ -45,22 +44,6 @@ def lda_topics(processed_data: list, n_topics: int = 10, learning_decay: float =
 
     assert len(doc_topics) == len(processed_data)
     return topics, doc_topics
-
-
-def lda_mallet_topics(processed_data: list, n_topics: int = 10, n_words: int = 10, n_iterations: int = 100):
-    mallet_path = 'data/mallet-2.0.8/bin/mallet'
-    dictionary = corpora.Dictionary(processed_data, )
-    doc_term_matrix = [dictionary.doc2bow(doc) for doc in processed_data]
-
-    lda_mallet = LdaMallet(mallet_path, corpus=doc_term_matrix, num_topics=n_topics,
-                           id2word=dictionary, iterations=n_iterations)
-
-    topics = []
-    for i_t, _ in enumerate(lda_mallet.get_topics()):
-        topic = [w for w, _ in lda_mallet.show_topic(i_t, topn=n_words)]
-        topics.append(topic)
-
-    return topics
 
 
 def nmf_topics(preprocessed_data: list, vocabulary: list, n_topics: int = 10,

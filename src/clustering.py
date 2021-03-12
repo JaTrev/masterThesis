@@ -1,6 +1,4 @@
 from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering, DBSCAN
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.metrics import pairwise_distances
 from src.misc import *
 import numpy as np
 from sklearn.decomposition import NMF

@@ -1,14 +1,9 @@
 from gensim.models import Word2Vec
-from gensim.models.fasttext import FastText
 import gensim.downloader as api
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from tqdm import tqdm
 import numpy as np
-import os
-import pickle
-import io
 
 
 def get_saved_w2v_model(w2v_model: str) -> Word2Vec:
@@ -180,101 +175,6 @@ def get_tf_idf(processed_data: list):
 
     return tfidf_matrix
 
-
-def get_glove_embeddings(vocab: list, filename=None, save_embeddings=False):
-
-    if isinstance(filename, str):
-
-        with open(filename, "rb") as f:
-            embeddings_index = pickle.load(f)
-
-    else:
-        # get glove embeddings
-        print("Getting GloVe embeddings!")
-
-        embeddings_index = {}
-        f = open(os.path.join('data/', 'glove.twitter.27B.200d.txt'), encoding="utf8")
-        for line in f:
-            values = line.split()
-            word = values[0]
-
-            try:
-                embeddings_index[word] = np.asarray(values[1:], dtype='float32')
-            except ValueError:
-                print("couldn't include:")
-                print(word)
-        f.close()
-
-    glove_words = list(embeddings_index.keys())
-    vocab_embeddings = []
-    new_vocab = []
-
-    for w in vocab:
-        if w in glove_words:
-
-            new_vocab.append(w)
-            vocab_embeddings.append(embeddings_index[w])
-
-    print("glove vocab has " + str(len(vocab) - len(new_vocab)) + " words less")
-
-    if save_embeddings:
-        assert isinstance(filename, str), "have not specified where to save the embeddings"
-
-        with open(filename, "wb") as myFile:
-            pickle.dump(embeddings_index, myFile)
-
-    return new_vocab, vocab_embeddings
-
-
-def get_fast_text_embeddings(processed_data: list, vocab: list, min_c: int = 50, win: int = 5, negative: int = 60,
-                             sample: float = 6e-5, alpha: float = 0.03,
-                             min_alpha: float = 0.0007, epochs: int = 30, size: int = 300):
-
-    # model = FastText(size=300, negative=40)
-    model = FastText(min_count=min_c, window=win, size=size, sample=sample, alpha=alpha, min_alpha=min_alpha,
-                     negative=negative, sorted_vocab=1)
-
-    model.build_vocab(processed_data, progress_per=10000)
-    model.train(processed_data, total_examples=model.corpus_count, epochs=epochs, report_delay=1)
-
-    # normalize vectors:
-    model.init_sims(replace=True)
-
-    vocab_words = [w for w in vocab if w in model.wv.index2word]
-    vocab_embeddings = [model.wv.vectors[model.wv.index2word.index(w)]
-                        for w in vocab if w in model.wv.index2word]
-
-    return vocab_words, vocab_embeddings
-
-
-def get_pretrained_fast_text_embeddings(vocab: list):
-    print("Getting fastText Embeddings")
-    file_name = "data/wiki-news-300d-1M.vec"
-    # "data/crawl-300d-2M.vec"
-
-    fin = io.open(file_name, 'r', encoding='utf-8', newline='\n', errors='ignore')
-    n, d = map(int, fin.readline().split())
-    fast_test_embeddings = {}
-
-    for line in tqdm(fin):
-        tokens = line.rstrip().split(' ')
-        fast_test_embeddings[tokens[0]] = map(float, tokens[1:])
-
-    print("Got Embeddings")
-
-    glove_words = list(fast_test_embeddings.keys())
-
-    vocab_embeddings = []
-    new_vocab = []
-
-    for w in tqdm(vocab):
-        if w in glove_words:
-            new_vocab.append(w)
-            vocab_embeddings.append(fast_test_embeddings[w])
-
-    print("fastText vocab has " + str(len(vocab) - len(new_vocab)) + " words less")
-
-    return new_vocab, vocab_embeddings
 
 
 def get_doc_embeddings(processed_data: list, data_labels: list, vocab: list, embedding_type: str, params=None, saved_model=None):
