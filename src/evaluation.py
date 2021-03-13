@@ -6,9 +6,9 @@ from sklearn.metrics import adjusted_rand_score, accuracy_score, adjusted_mutual
 import numpy as np
 
 
-def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v', top_n_words: int = 10) -> float:
+def c_v_coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v', top_n_words: int = 10) -> float:
     """
-    coherence_score calculates the coherence score based on the cluster_words and top_n_words.
+    c_v_coherence_score calculates the coherence score based on the cluster_words and top_n_words.
 
     :param processed_data: list of processed documents
     :param topic_words:  list of words for each topic (sorted)
@@ -17,12 +17,10 @@ def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v
     :return: coherence score
     """
 
-    assert cs_type in ['c_v', 'c_npmi'], "the cs_type must either be 'c_v' or 'c_npmi'"
-    assert len(topic_words) >= 1, "need at least 1 topic"
+    assert len(topic_words) > 1, "need at least 2 topics"
 
     if len(topic_words) == 1:
         return -1000
-
     dictionary = corpora.Dictionary(processed_data)
     corpus = [dictionary.doc2bow(text) for text in processed_data]
 
@@ -46,10 +44,10 @@ def coherence_score(processed_data: list, topic_words: list, cs_type: str = 'c_v
                         coherence=cs_type,
                         topn=top_n_words)
 
-    return cm.get_coherence()
+    return float("{:.2f}".format(cm.get_coherence()))
 
 
-def average_npmi_topics(documents, topic_words_large, ntopics,):
+def npmi_coherence_score(documents: list, topic_words_large: list, ntopics: int):
     """
     Average NPMI from:
     Tired of Topic Models? Clusters of Pretrained Word Embeddings Make for Fast and Good Topics too!
@@ -130,7 +128,7 @@ def average_npmi_topics(documents, topic_words_large, ntopics,):
 
     avg_score = np.around(np.mean(all_topics), 5)
 
-    return avg_score
+    return float("{:.2f}".format(avg_score))
 
 
 def davies_bouldin_index(topic_word_embeddings: list) -> float:
@@ -152,7 +150,7 @@ def davies_bouldin_index(topic_word_embeddings: list) -> float:
         temp_labels.extend([i_t] * len(t_word_embeddings))
         temp_topic_words_embeddings.extend(t_word_embeddings)
 
-    return sklearn.metrics.davies_bouldin_score(temp_topic_words_embeddings, temp_labels)
+    return float("{:.2f}".format(sklearn.metrics.davies_bouldin_score(temp_topic_words_embeddings, temp_labels)))
 
 
 def ari_score(labels_true, labels_pred):

@@ -9,6 +9,17 @@ from collections import Counter
 
 def vis_classification_score(topics_list: list, model_type: str, doc_labels_true: list, doc_topics_pred_list: list,
                              filename, n_words=10, multiple_true_label_set=False):
+    """
+
+    :param topics_list:
+    :param model_type:
+    :param doc_labels_true:
+    :param doc_topics_pred_list:
+    :param filename:
+    :param n_words:
+    :param multiple_true_label_set:
+    :return:
+    """
     # filename = "visuals/classification_scores.txt"
 
     if any([len(t) > n_words for topics in topics_list for t in topics]):
@@ -45,6 +56,13 @@ def vis_classification_score(topics_list: list, model_type: str, doc_labels_true
 
 
 def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name: str):
+    """
+
+    :param doc_labels_true:
+    :param doc_topics_pred:
+    :param model_name:
+    :return:
+    """
 
     assert len(doc_labels_true) == len(doc_topics_pred), "labels must have same length"
 
@@ -96,6 +114,18 @@ def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name:
 
 def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, test_c_v_scores: list,
                      test_nmpi_scores: list, filename: str, dbs_scores: list = None, n_words: int = 10):
+    """
+
+    :param topics_list:
+    :param c_v_scores:
+    :param nmpi_scores:
+    :param test_c_v_scores:
+    :param test_nmpi_scores:
+    :param filename:
+    :param dbs_scores:
+    :param n_words:
+    :return:
+    """
     assert len(topics_list) == len(c_v_scores)
     assert len(c_v_scores) == len(nmpi_scores)
 
@@ -135,6 +165,10 @@ def vis_topics_score(topics_list: list, c_v_scores: list, nmpi_scores: list, tes
 
 
 def vis_prep():
+    """
+
+    :return:
+    """
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.tick_params(axis='both', labelsize=12)
 
@@ -157,6 +191,16 @@ def vis_prep():
 
 
 def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: list, type: str) -> plt:
+    """
+
+    :param x:
+    :param ys:
+    :param x_label:
+    :param y_label:
+    :param color_legends:
+    :param type:
+    :return:
+    """
     fig, ax = vis_prep()
 
     assert type in ["c_v", "u_mass", "c_npmi", "dbs", "ari", "ami", "acc"], "define the type of scatter plot"
@@ -201,44 +245,6 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     plt.setp(ax.spines.values(), linewidth=2)
     plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
     return plt, fig
-
-
-def write_topics_viz(topics: list, score: float, label: str, filename: str, n_words: int = 10):
-    if any([len(t) > n_words for t in topics]):
-        new_topics = [t[:10] for t in topics]
-        topics = new_topics
-
-    with open(filename, "w") as myFile:
-
-        myFile.write(label + ": " + str(score) + '\n')
-        myFile.write('\n\n\n')
-
-        for i, t in enumerate(topics):
-            myFile.write('Topic ' + str(i+1) + '\n')
-
-            for w in t:
-                myFile.write(w + ' ')
-
-            myFile.write('\n\n\n')
-
-
-def write_topics_ablation(topics: list, score: float, filename: str, n_words: int = 10):
-    if any([len(t) > n_words for t in topics]):
-        new_topics = [t[:10] for t in topics]
-        topics = new_topics
-
-    with open(filename, "w") as myFile:
-
-        myFile.write('Coherence Score: ' + str(score))
-        myFile.write('\n')
-
-        for i, t in enumerate(topics):
-            myFile.write('Topic ' + str(i+1) + '\n')
-
-            for w in t:
-                myFile.write(w + ' ')
-
-            myFile.write('\n\n\n')
 
 
 def tsne_plot(clusters: list, cluster_embeddings: list,

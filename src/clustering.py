@@ -13,7 +13,6 @@ def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_w
     nmf_clustering uses the similarity matrix based on the word_embeddings to perform NMF factorization.
     The similarity matrix is pruned by removing small values which gives a sparser similarity space to operate in.
 
-    based on "Rethinking Topic Modelling: From Document-Space to Term-Space" by Magnus Sahlgren
     :param word_embeddings:
     :param words:
     :param n_clusters:
@@ -54,12 +53,28 @@ def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_w
 
 
 def kmeans_clustering(word_embeddings: list, word_weights: list = None, params: dict = None) -> list:
+    """
+
+    :param word_embeddings:
+    :param word_weights:
+    :param params:
+    :return:
+    """
     model = KMeans(**params)
     return model.fit_predict(word_embeddings, word_weights)
 
 
 def hdbscan_clustering(embeddings: list, min_cluster_size: int = 10, n_neighbors: int = 15, n_components: int = 5,
                        do_dim_reduction=False):
+    """
+
+    :param embeddings:
+    :param min_cluster_size:
+    :param n_neighbors:
+    :param n_components:
+    :param do_dim_reduction:
+    :return:
+    """
 
     if do_dim_reduction:
         umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components,
@@ -73,21 +88,49 @@ def hdbscan_clustering(embeddings: list, min_cluster_size: int = 10, n_neighbors
 
 
 def agglomerative_clustering(word_embeddings: list, word_weights: list = None, params: dict = None):
+    """
+
+    :param word_embeddings:
+    :param word_weights:
+    :param params:
+    :return:
+    """
     model = AgglomerativeClustering(**params)
     return model.fit_predict(word_embeddings, word_weights)
 
 
 def spectral_clustering(word_embeddings: list, word_weights: list = None, params: dict = None):
+    """
+
+    :param word_embeddings:
+    :param word_weights:
+    :param params:
+    :return:
+    """
     model = SpectralClustering(**params)
     return model.fit_predict(word_embeddings, word_weights)
 
 
 def dbscan_cluster(word_embeddings: list, word_weights: list = None):
+    """
+
+    :param word_embeddings:
+    :param word_weights:
+    :return:
+    """
     return DBSCAN(min_samples=6).fit_predict(word_embeddings, sample_weight=word_weights)
 
 
 def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: list,
                weight_type: str = "tf") -> (list, list):
+    """
+
+    :param processed_docs:
+    :param cluster_words:
+    :param cluster_embeddings:
+    :param weight_type:
+    :return:
+    """
 
     assert len(cluster_words) == len(cluster_embeddings), "cluster_words and cluster_embeddings do not " \
                                                           "have the same amount of clusters"
@@ -130,12 +173,12 @@ def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: li
     return sorted_cluster_words, sorted_cluster_embeddings
 
 
-def word_clusters(processed_docs: list, words: list, word_embeddings: list, vocab: list,
-                  clustering_type: str, params: dict,
-                  clustering_weight_type: str = 'tf',
-                  ranking_weight_type=None) -> (list, list):
+def get_word_clusters(processed_docs: list, words: list, word_embeddings: list, vocab: list,
+                      clustering_type: str, params: dict,
+                      clustering_weight_type: str = 'tf',
+                      ranking_weight_type=None) -> (list, list):
     """
-    word_clusters returns a sorted list of words for each cluster
+    get_word_clusters returns a sorted list of words for each cluster
 
     :param processed_docs: list of preprocessed documents
     :param words: list of words
@@ -151,13 +194,13 @@ def word_clusters(processed_docs: list, words: list, word_embeddings: list, voca
     # :param n_words: number of words for every cluster
 
     assert len(word_embeddings) == len(words), "word_embeddings and word list do not have the same length"
-    assert clustering_type in ['kmeans', 'agglomerative', 'spectral', 'nmf'], "incorrect clustering_type"
+    assert clustering_type in ['K-Means', 'Agglomerative', 'Spectral', 'NMF'], "incorrect clustering_type"
     assert all([w in vocab for w in words]), "some words are not in the vocabulary"
 
     clustering_dict = {
-        'kmeans': kmeans_clustering,
-        'agglomerative': agglomerative_clustering,
-        'spectral': spectral_clustering
+        'K-Means': kmeans_clustering,
+        'Agglomerative': agglomerative_clustering,
+        'Spectral': spectral_clustering
     }
 
     if clustering_weight_type is None:
@@ -218,7 +261,7 @@ def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
                         clustering_type: str, params: dict,
                         clustering_weight_type: str = 'vocab_count') -> (list, list):
     """
-    word_clusters returns a sorted list of words for each cluster
+    get_word_clusters returns a sorted list of words for each cluster
 
     :param doc_data: list of preprocessed documents
     :param doc_embeddings: list of word embeddings

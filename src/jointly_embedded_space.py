@@ -98,20 +98,20 @@ def w_d_clustering(all_data_processed: list, vocab: list, tokenized_docs: list, 
                 topics_words_embeddings.append(t_words_embeddings)
                 topic_embeddings.append(t_embedding)
 
-            cs_c_v = float("{:.2f}".format(coherence_score(all_data_processed, topics_words, cs_type='c_v')))
+            cs_c_v = float("{:.2f}".format(c_v_coherence_score(all_data_processed, topics_words, cs_type='c_v')))
             print(cluster_type)
             print("c_v: " + str(cs_c_v))
-            cs_npmi = float("{:.2f}".format(average_npmi_topics(all_data_processed, topics_words, len(topics_words))))
+            cs_npmi = float("{:.2f}".format(npmi_coherence_score(all_data_processed, topics_words, len(topics_words))))
 
             y_c_v_model[cluster_type].append(cs_c_v)
             y_npmi_model[cluster_type].append(cs_npmi)
             y_topics[cluster_type].append(topics_words)
 
             # extrinsic
-            test_y_c_v_model[cluster_type].append(float("{:.2f}".format(coherence_score(test_tokenized_docs,
-                                                                                        topics_words, cs_type='c_v'))))
-            test_y_npmi_model[cluster_type].append(average_npmi_topics(test_tokenized_docs, topics_words,
-                                                                       len(topics_words)))
+            test_y_c_v_model[cluster_type].append(float("{:.2f}".format(c_v_coherence_score(test_tokenized_docs,
+                                                                                            topics_words, cs_type='c_v'))))
+            test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_docs, topics_words,
+                                                                        len(topics_words)))
 
             if k == true_topic_amount:
                 label_distribution(true_labels, labels_predict, cluster_type)

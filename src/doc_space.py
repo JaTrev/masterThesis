@@ -1,9 +1,21 @@
 from src.model import *
 from src.visualizations import *
+from src.misc import save_model_scores
 
 
-def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, doc_labels_true: list,
-                 test_tokenized_docs: list, x: list = None):
+def baseline_topic_model(all_data_processed: list, vocab: list, tokenized_docs: list, doc_labels_true: list,
+                         test_tokenized_docs: list, x: list = None):
+
+    """
+
+    :param all_data_processed:
+    :param vocab:
+    :param tokenized_docs:
+    :param doc_labels_true:
+    :param test_tokenized_docs:
+    :param x:
+    :return:
+    """
     if x is None:
         x = list(range(2, 22, 2))
     else:
@@ -11,46 +23,44 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
 
     true_topic_amount = len(set(doc_labels_true))
 
-    y_topics = {'nmf_tf': [], 'nmf_tf_idf': [], 'lda': []}
+    y_topics = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
 
-    y_c_v_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
-    y_npmi_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
+    y_c_v_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
+    y_npmi_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
 
-    test_y_c_v_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
-    test_y_npmi_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
+    test_y_c_v_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
+    test_y_npmi_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
 
-    doc_topics_pred_model = {"nmf_tf": [], "nmf_tf_idf": [], "lda": []}
+    doc_topics_pred_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
     for k in x:
 
         for m in list(y_topics.keys()):
 
-            if m == 'nmf_tf':
+            if m == 'NMF TF':
                 topics, doc_topics_pred = nmf_topics(all_data_processed, vocabulary=vocab, n_topics=k, solver='cd',
                                                      beta_loss='frobenius', use_tfidf=False, n_words=50)
 
-            elif m == 'nmf_tf_idf':
+            elif m == 'NMF TF-IDF':
                 topics, doc_topics_pred = nmf_topics(all_data_processed, vocabulary=vocab, n_topics=k, solver='cd',
                                                      beta_loss='frobenius', use_tfidf=True, n_words=50)
 
-            elif m == 'lda':
+            elif m == 'LDA':
                 topics, doc_topics_pred = lda_topics(all_data_processed, n_topics=k,  n_words=50)
 
             else:
                 print(str(m) + "not in :" + str(y_topics.keys()))
                 return
 
-            # topic evaluation
-            cs_c_v = float("{:.2f}".format(coherence_score(tokenized_docs, topics, cs_type='c_v')))
-            cs_npmi = average_npmi_topics(tokenized_docs, topics, len(topics))
-
-            y_c_v_model[m].append(cs_c_v)
-            y_npmi_model[m].append(cs_npmi)
-
-            test_y_c_v_model[m].append(float("{:.2f}".format(coherence_score(test_tokenized_docs,
-                                                                             topics, cs_type='c_v'))))
-            test_y_npmi_model[m].append(average_npmi_topics(test_tokenized_docs, topics, len(topics)))
-
             y_topics[m].append(topics)
+
+            # topic evaluation
+            # intrinsic scores
+            y_c_v_model[m].append(c_v_coherence_score(tokenized_docs, topics, cs_type='c_v'))
+            y_npmi_model[m].append(npmi_coherence_score(tokenized_docs, topics, len(topics)))
+
+            # extrinsic scores
+            test_y_c_v_model[m].append(c_v_coherence_score(test_tokenized_docs, topics, cs_type='c_v'))
+            test_y_npmi_model[m].append(npmi_coherence_score(test_tokenized_docs, topics, len(topics)))
 
             # save predicted topics assigned for classification evaluation
             doc_topics_pred_model[m].append(doc_topics_pred)
@@ -58,6 +68,10 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
             if k == true_topic_amount:
                 label_distribution(doc_labels_true, doc_topics_pred, m)
 
+    save_model_scores(models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
+                      model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
+                      model_npmi_test_scores=test_y_npmi_model, filename_prefix='BL')
+    """
     # intrinsic
     # c_v coherence score
     ys = [l for l in y_c_v_model.values()]
@@ -99,3 +113,5 @@ def get_baseline(all_data_processed: list, vocab: list, tokenized_docs: list, do
         vis_classification_score(y_topics[m], m, doc_labels_true, doc_topics_pred_model[m],
                                  filename="visuals/classification_scores_" + str(m) + ".txt",
                                  multiple_true_label_set=True)
+                                 
+    """

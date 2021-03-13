@@ -1,22 +1,11 @@
 from src.get_data import *
 from src.preprocessing import *
-from src.model import *
-from src.evaluation import *
-from src.clustering import *
-from src.vectorization import *
-from src.visualizations import *
-from src.bert import *
-from src.graphs import *
-from src.doc_space import *
-from src.w_d_space import *
-from src.word_space import *
-
+from src.jointly_embedded_space import *
+from src.word_space_topicModeling import *
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.font_manager
 from collections import Counter
-import networkx as nx
-import karateclub
 
 
 data, data_labels, test_data, test_data_labels = get_data()
@@ -157,15 +146,15 @@ if __name__ == "__main__":
     #####
     # document space
     #####
-    # get_baseline(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
+    # baseline_topic_model(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
     # not used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
 
     #####
     # word space
     #####
-    # get_w2v_vis_sign_words(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # get_w2v_vis_topic_vec(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # get_graph_components(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+    # re_ranking_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+    # topic_vector_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+    # k_components_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
     # bert_visualization(data_processed, vocab, test_tokenized_docs)
 
     ####

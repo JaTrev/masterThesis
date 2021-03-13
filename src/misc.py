@@ -2,6 +2,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from collections import Counter
 import math
+from src.visualizations import *
 
 
 def absolute_word_counter(processed_docs: list) -> Counter:
@@ -80,3 +81,65 @@ def get_most_similar_indices(embedding, list_embedding, n_most_similar: int = 10
     most_sim = np.argsort(sim_matrix, axis=None)[:: -1]
 
     return most_sim[:n_most_similar]
+
+
+
+def save_model_scores(models: list, model_topics: dict, model_c_v_scores: dict, model_npmi_scores: dict,
+                      model_c_v_test_scores: dict, model_npmi_test_scores: dict, filename_prefix: str,
+                      model_dbs_scores: dict = None):
+
+    """
+
+    :param models:
+    :param model_topics:
+    :param model_c_v_scores:
+    :param model_npmi_scores:
+    :param model_c_v_test_scores:
+    :param model_npmi_test_scores:
+    :param filename_prefix:
+    :param model_dbs_scores:
+    :return:
+    """
+
+    # if the same models saved in every score dict
+    assert all(x in models for x in model_c_v_scores.keys())
+    assert all(x in models for x in model_npmi_scores.keys())
+    assert all(x in models for x in model_npmi_test_scores.keys())
+    assert all(x in models for x in model_c_v_test_scores.keys())
+    assert all(x in models for x in model_topics.keys())
+
+    if isinstance(model_dbs_scores, dict):
+        assert all(x in models for x in model_dbs_scores.keys())
+
+    # c_v coherence score figure - intrinsic
+    ys = [l for l in model_c_v_scores.values()]
+    _, fig = scatter_plot(models, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=models, type='c_v')
+    fig.savefig("visuals/" + filename_prefix + "_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+    fig.close()
+
+    # NPMI coherence score figure - intrinsic
+    ys = [l for l in model_npmi_scores.values()]
+    _, fig = scatter_plot(models, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+                          color_legends=models, type='c_npmi')
+    fig.savefig("visuals/" + filename_prefix + "_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # c_v coherence score figure - extrinsic
+    ys = [l for l in model_c_v_test_scores.values()]
+    _, fig = scatter_plot(models, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+                          color_legends=models, type='c_v')
+    fig.savefig("visuals/" + filename_prefix + "_extrinsic_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # NPMI coherence score figure - extrinsic
+    ys = [l for l in model_npmi_test_scores.values()]
+    _, fig = scatter_plot(models, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+                          color_legends=models, type='c_npmi')
+    fig.savefig("visuals/" + filename_prefix + "_extrinsic_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # save all topics with their associated scores
+    for m in models:
+        vis_topics_score(model_topics[m], model_c_v_scores[m], model_npmi_scores[m], model_c_v_test_scores[m],
+                         model_npmi_test_scores[m], "visuals/ws_clusters_eval_" + str(m) + ".txt",
+                         dbs_scores=model_dbs_scores[m])
+
+    plt.close('all')
