@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import collections
 from tqdm import tqdm
-import numpy as np
 import pickle
 from pathlib import Path
 
@@ -45,39 +44,26 @@ def get_partition(task_data_path, path="data/processed_tasks/metadata/partition.
     return id_to_partition, partition_to_id
 
 
-def get_class_names(class_name, path="/data/processed_tasks/metadata/"):
-    if class_name == 'topic':
-        df = pd.read_csv(os.path.join(path, 'topic_class_mapping.csv'))
-        return df['topic'].values.tolist()
-    else:
-        df = pd.read_csv(os.path.join(path, 'emotion_class_mapping.csv'))
-        return df['emotion'].values.tolist()
-
-
-def load_id2topic(save_path):
-    df = pd.read_csv(save_path)
-    df = df.values.tolist()
-    id2topic = {row[0]: row[1] for row in df}
-    return id2topic
-
-
-def classid_to_classname(labels, save_path):
-    id2topic = load_id2topic(save_path)
-    return np.vectorize(id2topic.get)(labels)
-
-
 def read_classification_classes(label_file):
+    """
+    read_classification_classes is used to extract the class_ids from the label file
+
+    :param label_file: path to csv file
+    :return: list of class ids
+    """
+
     df = pd.read_csv(label_file, delimiter=",", usecols=['class_id'])
     y_list = df['class_id'].tolist()
     return y_list
 
 
-def read_cont_scores(label_file):
-    df = pd.read_csv(label_file, delimiter=",", usecols=['mean'])
-    return df['mean'].tolist()
-
-
 def sort_trans_files(elem):
+    """
+    sort_trans_files is used to calculate a key with which the transcriptions files are sorted
+
+    :param elem: a file name
+    :return: file weight used in sorting
+    """
     return int(elem.split('_')[-1].split('.')[0])
 
 
@@ -131,7 +117,6 @@ def get_data(task_data_path='data/processed_tasks/c2_muse_topic',
     """
 
     if Path("data/saved_data.pickle").is_file():
-        print("Fetching data via pickle!")
 
         with open("data/saved_data.pickle", "rb") as myFile:
             data = pickle.load(myFile)

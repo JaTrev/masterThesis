@@ -1,13 +1,14 @@
-from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering, DBSCAN
+from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering
 from src.misc import *
 import numpy as np
 from sklearn.decomposition import NMF
 import hdbscan
 import umap
+from typing import Tuple
 
 
 def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_words: int = 10, random_state: int = 42,
-                    init: str = 'nndsvd', solver: str = 'cd', beta_loss: str = 'frobenius'):
+                   init: str = 'nndsvd', solver: str = 'cd', beta_loss: str = 'frobenius'):
 
     """
     nmf_clustering uses the similarity matrix based on the word_embeddings to perform NMF factorization.
@@ -54,27 +55,41 @@ def nmf_clustering(word_embeddings: list, words: list, n_clusters: int = 10, n_w
 
 def kmeans_clustering(word_embeddings: list, word_weights: list = None, params: dict = None) -> list:
     """
+    kmeans_clustering performs K-Means clustering on word_embeddings
 
-    :param word_embeddings:
-    :param word_weights:
-    :param params:
-    :return:
+    :param word_embeddings: list of word embeddings
+    :param word_weights: list of word weights
+    :param params: dictionary of clustering weights
+
+    :return: list of labels
     """
     model = KMeans(**params)
     return model.fit_predict(word_embeddings, word_weights)
 
 
-def hdbscan_clustering(embeddings: list, min_cluster_size: int = 10, n_neighbors: int = 15, n_components: int = 5,
-                       do_dim_reduction=False):
+def hdbscan_clustering(words: list, embeddings: list, min_cluster_size: int = 10, n_neighbors: int = 15,
+                       n_components: int = 5, do_dim_reduction=False, n_words: int = 30) \
+        -> Tuple[list, list, list, list]:
     """
+    hdbscan_clustering performs HDBSCAN clusterings on the list of embeddings
 
-    :param embeddings:
-    :param min_cluster_size:
-    :param n_neighbors:
-    :param n_components:
-    :param do_dim_reduction:
+    :param words: list of words
+    :param embeddings: list of embeddings of the words
+    :param min_cluster_size: minimum cluster size
+    :param n_neighbors: number of neighbors (used in UMAP)
+    :param n_components: number of components (used in UMAP)
+    :param do_dim_reduction: flag for UMAP
+    :param n_words: number of topic representatives
+
     :return:
+        - list of cluster labels
+        - list of clustering probabilities
+        - list of topic representatives
+        - list of embeddings of topic representatives
+
+    cluster.labels_, cluster.probabilities_, hdbscan_clusters_words, hdbscan_clusters_words_embeddings
     """
+    assert len(words) == len(embeddings)
 
     if do_dim_reduction:
         umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components,
@@ -84,52 +99,70 @@ def hdbscan_clustering(embeddings: list, min_cluster_size: int = 10, n_neighbors
     cluster = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, metric='euclidean',
                               cluster_selection_method='eom').fit(embeddings)
 
-    return cluster.labels_, cluster.probabilities_
+    temp_cluster_words = [[] for _ in range(len(set(cluster.labels_)) - 1)]
+    temp_cluster_embeddings = [[] for _ in range(len(set(cluster.labels_)) - 1)]
+    for i, label in enumerate(cluster.labels_):
+
+        if label == -1:
+            # noise
+            continue
+        temp_cluster_words[label].append([words[i], cluster.probabilities_[i]])
+        temp_cluster_embeddings[label].append(embeddings[i])
+
+    hdbscan_clusters_words = []
+    hdbscan_clusters_words_embeddings = []
+    for i_c, c in enumerate(temp_cluster_words):
+        c_sorted_indices = sorted(range(len(c)), key=lambda i_w: c[i_w][1], reverse=True)
+
+        hdbscan_clusters_words.append([c[i][0] for i in c_sorted_indices[:n_words]])
+        hdbscan_clusters_words_embeddings.append([temp_cluster_embeddings[i_c][i]
+                                                  for i in c_sorted_indices[:n_words]])
+
+    return cluster.labels_, cluster.probabilities_, hdbscan_clusters_words, hdbscan_clusters_words_embeddings
 
 
-def agglomerative_clustering(word_embeddings: list, word_weights: list = None, params: dict = None):
+def agglomerative_clustering(word_embeddings: list, word_weights: list = None, params: dict = None) -> list:
     """
+    agglomerative_clustering performs Agglomerative clustering on the given word_embeddings
 
-    :param word_embeddings:
-    :param word_weights:
-    :param params:
-    :return:
+    :param word_embeddings: list of word embeddings
+    :param word_weights: list of word weights, for weighted clustering
+    :param params: cluster parameters
+
+    :return: list of labels
     """
     model = AgglomerativeClustering(**params)
     return model.fit_predict(word_embeddings, word_weights)
 
 
-def spectral_clustering(word_embeddings: list, word_weights: list = None, params: dict = None):
+def spectral_clustering(word_embeddings: list, word_weights: list = None, params: dict = None) -> list:
     """
+    spectral_clustering performs Spectral clustering on the given word embeddings
 
-    :param word_embeddings:
-    :param word_weights:
-    :param params:
-    :return:
+    :param word_embeddings: list of word embeddings
+    :param word_weights: list of word weights, for weighted clustering
+    :param params: cluster parameters
+
+    :return: list of labels
     """
     model = SpectralClustering(**params)
     return model.fit_predict(word_embeddings, word_weights)
 
 
-def dbscan_cluster(word_embeddings: list, word_weights: list = None):
-    """
-
-    :param word_embeddings:
-    :param word_weights:
-    :return:
-    """
-    return DBSCAN(min_samples=6).fit_predict(word_embeddings, sample_weight=word_weights)
-
-
-def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: list,
+def sort_words(processed_segments: list, cluster_words: list, cluster_embeddings: list,
                weight_type: str = "tf") -> (list, list):
     """
+    sort_words sorts the words within each cluster by the given weight type
 
-    :param processed_docs:
-    :param cluster_words:
-    :param cluster_embeddings:
-    :param weight_type:
+    :param processed_segments: list of preprocessed segments
+    :param cluster_words: list of word clusters
+    :param cluster_embeddings: list of word embedding clusters
+    :param weight_type: weighted type by which the words are sorted ["tf", "tf-df", "tf-idf"]
+
     :return:
+        - sorted_cluster_words - sorted topic representatives
+        - sorted_cluster_embeddings - sorted topic embeddings
+
     """
 
     assert len(cluster_words) == len(cluster_embeddings), "cluster_words and cluster_embeddings do not " \
@@ -140,29 +173,21 @@ def sort_words(processed_docs: list, cluster_words: list, cluster_embeddings: li
     assert weight_type in ["tf", "tf-df", "tf-idf"], "wrong counter_type!"
 
     # word_weight = None
-    n_words = len([w for doc in processed_docs for w in doc])
+    n_words = len([w for doc in processed_segments for w in doc])
     clusters_vocab = list(set([w for c_words in cluster_words for w in c_words]))
 
-    word_weights = get_word_weights(processed_docs, vocab=clusters_vocab, n_words=n_words, weight_type=weight_type)
+    word_weights = get_word_weights(processed_segments, vocab=clusters_vocab, n_words=n_words, weight_type=weight_type)
 
     # calculate cluster centers
     cluster_centers = [np.mean(c_embeddings, axis=0) for c_embeddings in cluster_embeddings]
     assert len(cluster_centers) == len(cluster_embeddings)
     assert len(cluster_centers[0]) == len(cluster_embeddings[0][0])
 
-    # calculate cosine similarity to cluster center
-    cluster_similarities = [cosine_similarity(cluster_embeddings[i_c],
-                                              cluster_center.reshape(1, -1))
-                            for i_c, cluster_center in enumerate(cluster_centers)]
-
-    assert len(cluster_similarities) == len(cluster_embeddings)
-    assert len(cluster_similarities[0]) == len(cluster_embeddings[0])
-
     # sort cluster_words
     sorted_cluster_words = []
     sorted_cluster_embeddings = []
     sorted_cluster_idxs = [sorted(range(len(c)),
-                                  key=lambda k: word_weights[c[k]],  # * cluster_similarities[i_c][k]
+                                  key=lambda k: word_weights[c[k]],
                                   reverse=True)
                            for i_c, c in enumerate(cluster_words)]
 
@@ -209,7 +234,6 @@ def get_word_clusters(processed_docs: list, words: list, word_embeddings: list, 
         word_weights = None
 
     else:
-        print("Performing weighted clustering!")
 
         n_words = len([w for doc in processed_docs for w in doc])
         word_weights_dict = get_word_weights(processed_docs, vocab, n_words, weight_type=clustering_weight_type)
@@ -257,59 +281,49 @@ def get_word_clusters(processed_docs: list, words: list, word_embeddings: list, 
                           weight_type=ranking_weight_type)
 
 
-def document_clustering(doc_data: list, doc_embeddings: list, vocab: list,
-                        clustering_type: str, params: dict,
-                        clustering_weight_type: str = 'vocab_count') -> (list, list):
+def segment_clustering(segment_data: list, doc_embeddings: list,
+                       clustering_type: str, params: dict,
+                       ) -> Tuple[list, list, list, list]:
     """
-    get_word_clusters returns a sorted list of words for each cluster
+    segment_clustering returns a sorted list of segments
 
-    :param doc_data: list of preprocessed documents
+    :param segment_data: list of preprocessed documents
     :param doc_embeddings: list of word embeddings
-    :param vocab: list of vocabulary words
     :param clustering_type: defines the clustering method ('kmeans', 'agglomerative', 'spectral')
     :param params: clustering parameters
-    :param clustering_weight_type: word weighting type used for clustering ("tf", "tf-df", "tf-idf")
 
     :return:
+        - cluster_segments - clustering of segments
+        - cluster_embeddings - clustering of segment embeddings
+        - segment_data - segment_data
+
+    cluster_segments, cluster_embeddings, labels, segment_data
     """
 
-    doc_names = [str(i) for i in range(len(doc_data))]
+    doc_names = [str(i) for i in range(len(segment_data))]
 
     assert len(doc_embeddings) == len(doc_names), "doc_embeddings and word list do not have the same length"
-    assert clustering_type in ['kmeans', 'agglomerative'], "incorrect clustering_type"
+    assert clustering_type in ['K-Means', 'Agglomerative'], "incorrect clustering_type"
 
     clustering_dict = {
-        'kmeans': kmeans_clustering,
-        'agglomerative': agglomerative_clustering,
-        'spectral': spectral_clustering
+        'K-Means': kmeans_clustering,
+        'Agglomerative': agglomerative_clustering,
+        'Spectral': spectral_clustering
     }
 
-    # print("Performing weighted clustering!")
-    # doc_weights_dict = get_doc_weights(doc_data, vocab, weight_type=clustering_weight_type)
-    # doc_weights = [doc_weights_dict[doc] for doc in doc_names]
     doc_weights = None
 
     # cluster words to cluster labels
     labels = clustering_dict[clustering_type](doc_embeddings, doc_weights, params)
 
     # assign each word to cluster list
-    cluster_docs = [[] for _ in range(len(set(labels)))]
-    cluster_embeddings = [[] for _ in range(len(cluster_docs))]
+    cluster_segments = [[] for _ in range(len(set(labels)))]
+    cluster_embeddings = [[] for _ in range(len(cluster_segments))]
 
     for l_id, label in enumerate(list(labels)):
 
-        cluster_docs[label].append(doc_data[l_id])
+        cluster_segments[label].append(segment_data[l_id])
         cluster_embeddings[label].append(doc_embeddings[l_id])
 
-    # todo: implement NMF for document clustering
-
-    assert len(labels) == len(doc_data)
-    return cluster_docs, cluster_embeddings, labels, doc_data
-
-
-if __name__ == "__main__":
-    docs = [["a", "asa", "asa"], ["a", "a", "aa"]]
-
-    # calculate words frequencies per document
-    # word_frequencies_per_doc = [Counter(doc) for doc in docs]
-
+    assert len(labels) == len(segment_data)
+    return cluster_segments, cluster_embeddings, labels, segment_data

@@ -4,14 +4,17 @@ from src.misc import *
 plt.rcParams['figure.figsize'] = [16, 9]
 
 
-def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, remove_isolated_nodes: bool):
+def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, remove_isolated_nodes: bool = 1) \
+        -> nx.Graph:
     """
+    remove_edges removes edges from graph that have a weight below the weight cutoff
 
-    :param graph:
-    :param edge_weights:
-    :param percentile_cutoff:
-    :param remove_isolated_nodes:
-    :return:
+    :param graph: word embedding graph
+    :param edge_weights: list or edge weights
+    :param percentile_cutoff: cutoff weight percentile
+    :param remove_isolated_nodes: if 1, remove islated nodes (default: 1)
+
+    :return: graph without lower weighted edges
     """
     # remove edges that do not have a high enough similarity score
     min_cutoff_value = np.percentile(edge_weights, percentile_cutoff)
@@ -38,14 +41,15 @@ def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, re
 def create_networkx_graph(words: list, word_embeddings: list, similarity_threshold: float = 0.4,
                           percentile_cutoff: int = 70, remove_isolated_nodes: bool = True) -> nx.Graph:
     """
+    create_networkx_graph creates a graph given the words and their embeddings
 
-    create_networdx_graph creates a graph given the words and their embeddings
     :param words: list of words which will be the nodes
     :param word_embeddings: embeddings of the words
     :param similarity_threshold: cosine similarity threshold value for the edges
     :param percentile_cutoff: percentile threshold value
     :param remove_isolated_nodes: boolean indicating if isolated nodes should be removed
-    :return: graph
+
+    :return: word embedding graph
     """
     assert len(words) == len(word_embeddings), "words and word_embeddings must have the same length"
     graph = nx.Graph()  # undirected graph
@@ -74,13 +78,18 @@ def create_networkx_graph(words: list, word_embeddings: list, similarity_thresho
     return remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes)
 
 
-def sort_words_by(graph: nx.Graph, word: str, word_weights: dict):
+def sort_words_by(graph, word: str, word_weights: dict) -> Tuple[int, float, float]:
     """
+    sort_words_by returns a tuple that is used to sort words with each topic calculated from k-components
 
-    :param graph:
-    :param word:
-    :param word_weights:
+    :param graph: word embedding graph
+    :param word: list of words
+    :param word_weights: list of word weights
+
     :return:
+        - w_degree - degree of the node
+        - sim_score - pooled similarity score of node
+        - w_weight - word weight
     """
 
     neighbor_weights = []

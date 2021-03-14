@@ -1,181 +1,107 @@
 from src.get_data import *
 from src.preprocessing import *
+from src.doc_space_topicModeling import *
 from src.jointly_embedded_space import *
 from src.word_space_topicModeling import *
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.font_manager
-from collections import Counter
+import argparse
 
 
-data, data_labels, test_data, test_data_labels = get_data()
+def main_fct(preprocessed_data_set: str, topic_model_type: str, misc_prints: str,
+             bert_embedding_type: str = "normal_ll"):
 
-new_data = []
-new_data_label = []
-for i, d in enumerate(data):
-    if len([w for w in d.split() if w.isalpha()]) > 2:
-        new_data.append(d)
-        new_data_label.append(data_labels[i])
-print("removed docs: " + str(len(data) - len(new_data)))
+    assert preprocessed_data_set in ["JN", "FP"]
+    assert (topic_model_type in ["Baseline", "RRW", "TVS", "k-components", "BERT", "avg_w2v", "doc2vec"]
+            or misc_prints in ["segment_size", "common_words"])
 
-new_test_data = []
-new_test_data_label = []
-for i, d in enumerate(test_data):
-
-    if len([w for w in d.split() if w.isalpha()]) > 2:
-        new_test_data.append(d)
-        new_test_data_label.append(test_data_labels[i])
-print("removed test docs: " + str(len(test_data) - len(new_test_data)))
-
-
-# all_data = [d for d in new_data]
-# all_data.extend(new_test_data)
-
-# all_data_label = [l for l in new_data_label]
-# all_data_label.extend(new_test_data_label)
-# assert len(all_data) == len(all_data_label)
-
-
-# TODO: create a main() function
-
-
-def number_of_words_per_doc():
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    mpl.rcParams['font.family'] = 'Avenir'
-    plt.rcParams['font.size'] = 25
-    plt.rcParams['axes.linewidth'] = 2
-
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(True)
-    ax.spines['left'].set_color('black')
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(True)
-    ax.spines['bottom'].set_color('black')
-
-    ax.yaxis.grid(color='grey', linestyle="--")
-    ax.xaxis.grid(alpha=0)
-
-    plt.margins(0)
-
-    all_data_lengths = [len([w for w in doc.split() if w.isalpha()]) for doc in new_data]
-    data_lengths_c = [all_data_lengths.count(int(i)) for i in range(int(np.max(all_data_lengths)))]
-    plt.bar(range(int(np.max(all_data_lengths))), data_lengths_c, color="black")
-
-    plt.xlim(right=int(np.max(all_data_lengths)))
-    plt.xlim(left=0)
-
-    plt.ylim(top=int(np.max(data_lengths_c)))
-    plt.ylim(bottom=0)
-
-    ax.set_xlabel("Number of Words", fontsize="medium")
-    ax.set_ylabel("Number of Segments", fontsize="medium")
-
-    plt.show()
-    fig.savefig("visuals/segment_word_distribution.pdf", bbox_inches='tight', transparent=True)
-
-
-def vis_most_common_words(data: list, raw_data: False, preprocessed: False):
-    if raw_data:
-        data = [doc.split() for doc in data]
-        y_max = 25000
-        filename = "most_common_words"
+    if preprocessed_data_set == "JN":
+        do_lemmatizing = False
+        do_stop_word_removal = False
     else:
-        if preprocessed:
+        do_lemmatizing = True
+        do_stop_word_removal = True
 
-            y_max = 1000
+    data_processed, data_processed_labels, vocab, tokenized_docs = preprocessing(
+        new_data, new_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
+
+    test_data_processed, test_data_processed_labels, test_vocab, test_tokenized_docs = preprocessing(
+        new_test_data, new_test_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
+
+    if topic_model_type == "Baseline":
+        baseline_topic_model(data_processed, vocab, tokenized_docs, data_processed_labels, test_tokenized_docs)
+
+    elif topic_model_type == "RRW":
+        word2vec_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs, topic_vector_flag=False)
+
+    elif topic_model_type == "TVS":
+        word2vec_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs, topic_vector_flag=True)
+
+    elif topic_model_type == "k-components":
+        k_components_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+
+    elif topic_model_type == "BERT":
+        bert_topic_model(bert_embedding_type, data_processed, vocab, test_tokenized_docs)
+
+    elif topic_model_type == "avg_w2v":
+        w_d_clustering(data_processed, preprocessed_data_set, vocab, data_processed_labels,
+                       test_tokenized_docs, segment_embedding_type="w2v_avg", true_topic_amount=10)
+
+    elif topic_model_type == "doc2vec":
+        w_d_clustering(data_processed, preprocessed_data_set, vocab, data_processed_labels,
+                       test_tokenized_docs, segment_embedding_type="doc2vec", true_topic_amount=10)
+
+    else:
+        if misc_prints == "segment_size":
+            temp_segments = [seg for seg in new_data]
+            temp_segments.extend(new_test_data)
+            number_of_words_per_doc(temp_segments)
+
         else:
-
-            y_max = 4000
-        filename = "processed_most_common_words"
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    mpl.rcParams['font.family'] = 'Avenir'
-    plt.rcParams['font.size'] = 20
-    plt.rcParams['axes.linewidth'] = 2
-
-    ax.tick_params(axis='both', labelsize=12)
-
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(True)
-    ax.spines['left'].set_color('black')
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(True)
-    ax.spines['bottom'].set_color('black')
-
-    ax.yaxis.grid(color='grey', linestyle="--", alpha=0.5)
-    ax.xaxis.grid(alpha=0)
-    plt.margins(0)
-
-    data_words = []
-    for doc in data:
-        data_words.extend([w.lower() for w in doc if w.isalpha()])
-
-    data_words_c = Counter(data_words)
-
-    most_common_words = [w for w, c in data_words_c.most_common(30)]
-    most_common_words_c = [c for w, c in data_words_c.most_common(30)]
-
-    plt.bar(most_common_words, most_common_words_c, color='black', width=0.5)
-
-    plt.ylim(top=y_max)
-    plt.ylim(bottom=0)
-
-    ax.set_xlabel("Top 30 Words", fontsize="medium")
-    ax.set_ylabel("Number of Occurrences", fontsize="medium")
-
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=-45, ha="left", rotation_mode="anchor")
-
-    fig.savefig("visuals/" + str(filename) + ".pdf", bbox_inches='tight', transparent=True)
-
-
+            assert misc_prints == "common_words", "must define a valid topic_model_type or a misc_prints"
+            vis_most_common_words(data_processed, raw_data=False, preprocessed=True)
 
 
 if __name__ == "__main__":
 
-    do_lemmatizing = False
-    do_stop_word_removal = False
+    data, data_labels, test_data, test_data_labels = get_data()
 
-    data_processed, data_labels, vocab, tokenized_docs = preprocessing(
-        new_data, new_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
+    new_data = []
+    new_data_label = []
+    for i, d in enumerate(data):
+        if len([w for w in d.split() if w.isalpha()]) > 2:
+            new_data.append(d)
+            new_data_label.append(data_labels[i])
+    print("removed training segments: " + str(len(data) - len(new_data)))
 
-    test_data_processed, test_data_labels, test_vocab, test_tokenized_docs = preprocessing(
-        new_test_data, new_test_data_label, do_lemmatizing=do_lemmatizing, do_stop_word_removal=do_stop_word_removal)
+    new_test_data = []
+    new_test_data_label = []
+    for i, d in enumerate(test_data):
+        if len([w for w in d.split() if w.isalpha()]) > 2:
+            new_test_data.append(d)
+            new_test_data_label.append(test_data_labels[i])
+    print("removed test segments: " + str(len(test_data) - len(new_test_data)))
 
-    #####
-    # document space
-    #####
-    # baseline_topic_model(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs)
-    # not used: doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pds', dest='data_set', type=str, required=True,
+                        help="state the preprocessed data set should be used: Just Nouns (JN), Fully Preprocessed (FP)")
 
-    #####
-    # word space
-    #####
-    # re_ranking_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # topic_vector_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # k_components_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
-    # bert_visualization(data_processed, vocab, test_tokenized_docs)
+    parser.add_argument('--tm', dest='topic_model', type=str, required=True,
+                        help="state what topic model that should be used")
 
-    ####
-    # word + doc space
-    ####
-    w_d_clustering(data_processed, vocab, tokenized_docs, data_labels, test_tokenized_docs,
-                   doc_embedding_type="doc2vec", true_topic_amount=8)
-    # test_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
+    parser.add_argument('--mp', dest='misc_prints', type=str, required=False, default=None,
+                        help="define the miscellaneous print that should be performed")
+    parser.add_argument('--bert', dest='bert_type', type=str, required=False, default=None,
+                        help="define the BERT embedding type")
 
-    # doc_clustering(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
+    args = parser.parse_args()
 
-    # bert_visualization(all_data_processed, vocab, tokenized_docs)
-    # w_d_get_graph_components(all_data_processed, vocab, tokenized_docs, all_data_labels, doc_embedding_type="w2v_avg")
+    assert args.data_set in ["JN", "FP"], "need to select a proper preprocessing schema [JN, FP]"
+    assert args.topic_model in ['Baseline', 'RRW', 'TVS', 'k-components', 'BERT', 'avg_w2v', 'doc2vec', 'null'], (
+        "select one of the topic models: ['Baseline', 'RRW', 'TVS', 'k-components', 'BERT', 'avg_w2v', 'doc2vec', "
+        "'null']")
 
+    if args.topic_model == "null":
+        assert args.misc_prints in ['segment_size', 'common_words'], ("select one of the misc_prints:  "
+                                                                      "['segment_size', 'common_words']")
 
-    ####
-    # Misc
-    ####
-    # number_of_words_per_doc()
-    # vis_most_common_words(data_processed, raw_data=False, preprocessed=True)
-
-
-
-
+    main_fct(preprocessed_data_set=args.data_set, topic_model_type=args.topic_model, misc_prints=args.misc_prints,
+             bert_embedding_type=args.bert_type)

@@ -5,6 +5,7 @@ from nltk.corpus import stopwords
 from stop_words import get_stop_words
 import nltk
 from collections import Counter
+from typing import Tuple
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -31,24 +32,33 @@ stop_words.extend(['put', 'yeah', 'lot''dot', 'le', "'ve", 'really', 'like', 'go
 stop_words.extend(["\'re", "n\'t", "n\'t", "'ve", "really", "car", "cars"])
 
 
-def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_lemmatizing: bool = False,
-                  remove_low_freq: bool = False, do_stop_word_removal=True) -> (list, list, list):
+def preprocessing(segments: list, segment_labels: list, do_stemming: bool = False, do_lemmatizing: bool = False,
+                  remove_low_freq: bool = False, do_stop_word_removal: bool = True, count_threshold: int = 1) \
+        -> Tuple[list, list, list, list]:
     """
-    Document for processing a list of documents.
+    preprocessing is used to preprocess the data set
+    
+    :param segments: raw list of segments
+    :param segment_labels: list of segment labels
+    :param do_stemming: if True, stemming is performed (default: False)
+    :param do_lemmatizing:  if True, lemmatization is performed (default: False)
+    :param remove_low_freq: if True, all words with absolute frequency under threshold are removed
+    :param do_stop_word_removal: if True, stop word removal is performed (default: False)
+    :param count_threshold: threshold used when remove_low_freq is set to True
 
-    Returns: preprocessed docs, vocabulary
+    :return:
+        - preprocessed segments
+        - abels of preprocessed segments
+        - list of vocaulary words
+        - list of tokenized 'raw' segments
+
     """
-    print("---------")
-    print("do_stemming: " + str(do_stemming))
-    print("do_lemmatizing: " + str(do_lemmatizing))
-    print("remove_low_freq: " + str(remove_low_freq))
-    print("---------")
 
     vocabulary = []
     new_docs = []
     new_labels = []
     tokenized_docs = []
-    for i, doc in enumerate(docs):
+    for i, doc in enumerate(segments):
 
         doc = doc.lower()
 
@@ -85,7 +95,7 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
             continue
 
         new_docs.append(tkns)
-        new_labels.append(docs_label[i])
+        new_labels.append(segment_labels[i])
         vocabulary.extend(tkns)
         tokenized_docs.append(tokenized_doc)
 
@@ -97,13 +107,11 @@ def preprocessing(docs: list, docs_label: list, do_stemming: bool = False, do_le
             temp_new_docs.extend(d)
         counter = Counter(temp_new_docs)
 
-        l_threshold = 1
-
         docs_threshold = []
         vocab_threshold = []
         for i_d, d in enumerate(new_docs):
 
-            d_threshold = [w for w in d if counter[w] > l_threshold]
+            d_threshold = [w for w in d if counter[w] > count_threshold]
             if len(d_threshold) > 0:
                 docs_threshold.append(d_threshold)
                 vocab_threshold.extend(d_threshold)

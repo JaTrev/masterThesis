@@ -6,18 +6,25 @@ import pickle
 from networkx.algorithms import approximation as apxa
 
 
+w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
+              'ns_exponent': 0.75}
 
-def re_ranking_topic_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
-                           x: list = None):
+
+def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
+                         x: list = None, topic_vector_flag: bool = False):
     """
-    
-    :param data_processed: 
-    :param vocab: 
-    :param tokenized_docs: 
-    :param test_tokenized_docs: 
-    :param x: 
-    :return: 
+    word2vec_topic_model performs topic modeling in word space using Word2Vec embeddings.
+    The function produces a range of files that list the resulting topics and visualize the model's performance.
+
+    :param data_processed: preprocessed data set used to calculated word embeddings
+    :param vocab: vocabulary of the preprocessed data set
+    :param tokenized_docs: tokenized version of the training data set
+    :param test_tokenized_docs: tokenized version of the test data set
+    :param x: list of number of topics to iterate over, default: list(range(2, 22, 2))
+    :param topic_vector_flag: flag used to switch between TVS model and RRW and, default: False (RRW model)
+
     """
+
     clustering_weight_type = 'tf'
     ranking_weight_type = 'tf'
 
@@ -26,40 +33,19 @@ def re_ranking_topic_model(data_processed: list, vocab: list, tokenized_docs: li
 
     else:
         assert isinstance(x, list)
-    w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
-                  'ns_exponent': 0.75}
 
     y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_dbs_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-
     test_y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     test_y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-
     y_topics = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
 
     words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
 
-    labels, probabilities = hdbscan_clustering(word_embeddings, min_cluster_size=6, do_dim_reduction=False)
-    temp_cluster_words = [[] for _ in range(len(set(labels)) - 1)]
-    temp_cluster_embeddings = [[] for _ in range(len(set(labels)) - 1)]
-    for i, label in enumerate(labels):
-
-        if label == -1:
-            # noise
-            continue
-        temp_cluster_words[label].append([words[i], probabilities[i]])
-        temp_cluster_embeddings[label].append(word_embeddings[i])
-
-    hdbscan_clusters_words = []
-    hdbscan_clusters_words_embeddings = []
-    for i_c, c in enumerate(temp_cluster_words):
-        c_sorted_indices = sorted(range(len(c)), key=lambda i_w: c[i_w][1], reverse=True)
-
-        hdbscan_clusters_words.append([c[i][0] for i in c_sorted_indices[:30]])
-        hdbscan_clusters_words_embeddings.append([temp_cluster_embeddings[i_c][i]
-                                          for i in c_sorted_indices[:30]])
-
+    _, _, hdbscan_clusters_words, hdbscan_clusters_words_embeddings = hdbscan_clustering(words, word_embeddings,
+                                                                                         min_cluster_size=6,
+                                                                                         do_dim_reduction=False)
     for k in x:
 
         for cluster_type in ["K-Means", "Agglomerative", "HDBSCAN"]:
@@ -74,12 +60,30 @@ def re_ranking_topic_model(data_processed: list, vocab: list, tokenized_docs: li
                     clustering_params = {'n_clusters': k, 'random_state': 42, }
                 else:
                     clustering_params = {'n_clusters': k}
-    
+
+                if topic_vector_flag:
+                    ranking_weight = None
+                else:
+                    ranking_weight = ranking_weight_type
+
                 clusters_words, clusters_words_embeddings = get_word_clusters(
                     data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
                     params=clustering_params, clustering_weight_type=clustering_weight_type,
-                    ranking_weight_type=ranking_weight_type,
+                    ranking_weight_type=ranking_weight,
                 )
+
+            if topic_vector_flag:
+                topic_vectors = [get_topic_vector(c) for c in clusters_words_embeddings]
+
+                # get topics based on topic vectors
+                topic_vector_cluster_words = []
+                topic_vector_cluster_words_embeddings = []
+                for t_vector in topic_vectors:
+                    sim_indices = get_nearest_indices(t_vector, word_embeddings)
+
+                    topic_vector_cluster_words.append([words[i_w] for i_w in sim_indices])
+                    topic_vector_cluster_words_embeddings.append([word_embeddings[i_w] for i_w in sim_indices])
+                clusters_words = topic_vector_cluster_words
 
             y_topics[cluster_type].append(clusters_words)
 
@@ -92,54 +96,28 @@ def re_ranking_topic_model(data_processed: list, vocab: list, tokenized_docs: li
             test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_docs, clusters_words))
             test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_docs, clusters_words,
                                                                         len(clusters_words)))
+    if topic_vector_flag:
+        filename_prefix = "TVS"
+    else:
+        filename_prefix = "RRW"
 
-    save_model_scores(models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
+    save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
-                      model_npmi_test_scores=test_y_npmi_model, filename_prefix='RRW', model_dbs_scores=y_dbs_model)
-
-    """# c_v coherence score - intrinsic
-    ys = [l for l in y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
-    fig.savefig("visuals/ws_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # u_mass coherence score
-    ys = [l for l in y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
-    fig.savefig("visuals/ws_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # c_v coherence score - extrinsic
-    ys = [l for l in test_y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
-    fig.savefig("visuals/ws_extrinsic_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # u_mass coherence score - extrinsic
-    ys = [l for l in test_y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
-    fig.savefig("visuals/ws_extrinsic_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    for m in list(y_topics.keys()):
-        assert len(y_c_v_model[m]) == len(y_npmi_model[m])
-        assert len(y_npmi_model[m]) == len(y_dbs_model[m])
-        assert len(y_dbs_model[m]) == len(y_topics[m])
-        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], test_y_c_v_model[m], test_y_npmi_model[m],
-                         "visuals/ws_clusters_eval_" + str(m) + ".txt", dbs_scores=y_dbs_model[m])
-    """
+                      model_npmi_test_scores=test_y_npmi_model, filename_prefix=filename_prefix,
+                      model_dbs_scores=y_dbs_model)
 
 
 def topic_vector_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
                        x: list = None):
     """
+    topic_vector_model is not used but performance the TVS model,
+    resulting in numbers file that list the resulting topics and visualize their performance.
 
-    :param data_processed:
-    :param vocab:
-    :param tokenized_docs:
-    :param test_tokenized_docs:
-    :param x:
-    :return:
+    :param data_processed: preprocessed data set used to calculated word embeddings
+    :param vocab: vocabulary of the preprocessed data set
+    :param tokenized_docs: tokenized version of the training data set
+    :param test_tokenized_docs: tokenized version of the test data set
+    :param x: list of number of topics to iterate over, default: list(range(2, 22, 2))
     """
     clustering_weight_type = 'tf'
 
@@ -148,9 +126,6 @@ def topic_vector_model(data_processed: list, vocab: list, tokenized_docs: list, 
 
     else:
         assert isinstance(x, list)
-
-    w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
-                  'ns_exponent': 0.75}
 
     words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
 
@@ -163,26 +138,10 @@ def topic_vector_model(data_processed: list, vocab: list, tokenized_docs: list, 
 
     y_topics = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
 
-    labels, probabilities = hdbscan_clustering(word_embeddings, min_cluster_size=6, do_dim_reduction=False)
-
-    temp_cluster_words = [[] for _ in range(len(set(labels)) - 1)]
-    temp_cluster_embeddings = [[] for _ in range(len(set(labels)) - 1)]
-    for i, label in enumerate(labels):
-
-        if label == -1:
-            # noise
-            continue
-        temp_cluster_words[label].append([words[i], probabilities[i]])
-        temp_cluster_embeddings[label].append(word_embeddings[i])
-
-    hdbscan_clusters_words = []
-    hdbscan_clusters_words_embeddings = []
-    for i_c, c in enumerate(temp_cluster_words):
-        c_sorted_indices = sorted(range(len(c)), key=lambda i_w: c[i_w][1], reverse=True)
-
-        hdbscan_clusters_words.append([c[i][0] for i in c_sorted_indices[:10]])
-        hdbscan_clusters_words_embeddings.append([temp_cluster_embeddings[i_c][i]
-                                          for i in c_sorted_indices[:10]])
+    _, _, hdbscan_clusters_words, hdbscan_clusters_words_embeddings = hdbscan_clustering(words, word_embeddings,
+                                                                                         min_cluster_size=6,
+                                                                                         do_dim_reduction=False,
+                                                                                         n_words=10)
 
     for k in x:
 
@@ -210,7 +169,7 @@ def topic_vector_model(data_processed: list, vocab: list, tokenized_docs: list, 
             topic_vector_cluster_words = []
             topic_vector_cluster_words_embeddings = []
             for t_vector in topic_vectors:
-                sim_indices = get_most_similar_indices(t_vector, word_embeddings)
+                sim_indices = get_nearest_indices(t_vector, word_embeddings)
 
                 topic_vector_cluster_words.append([words[i_w] for i_w in sim_indices])
                 topic_vector_cluster_words_embeddings.append([word_embeddings[i_w] for i_w in sim_indices])
@@ -224,77 +183,50 @@ def topic_vector_model(data_processed: list, vocab: list, tokenized_docs: list, 
             y_dbs_model[cluster_type].append(davies_bouldin_index(topic_vector_cluster_words_embeddings))
 
             # extrinsic coherence
-            test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_docs,clusters_words))
+            test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_docs, clusters_words))
             test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_docs, clusters_words,
                                                                         len(clusters_words)))
 
-    save_model_scores(models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
+    save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
                       model_npmi_test_scores=test_y_npmi_model, filename_prefix='TVS', model_dbs_scores=y_dbs_model)
+
+
+def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list):
     """
-    # c_v coherence score
-    ys = [l for l in y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
-    fig.savefig("visuals/ws_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+    k_components_model is used to perform topic model on the word embedding graph using k-components algorithm.
+    This function uses the k-components approximation function from the Networkx library
 
-    # npmi coherence score
-    ys = [l for l in y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
-    fig.savefig("visuals/ws_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # c_v coherence score - extrinsic
-    ys = [l for l in test_y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
-    fig.savefig("visuals/ws_extrinsic_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # u_mass coherence score - extrinsic
-    ys = [l for l in test_y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
-    fig.savefig("visuals/ws_extrinsic_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    for m in list(y_topics.keys()):
-        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m], test_y_c_v_model[m], test_y_npmi_model[m],
-                         "visuals/ws_clusters_eval_" + str(m) + ".txt", dbs_scores=y_dbs_model[m])
-    """
-
-
-def k_components_model(all_data_processed, vocab, tokenized_docs, test_tokenized_docs):
-    """
-
-    :param all_data_processed:
-    :param vocab:
-    :param tokenized_docs:
-    :param test_tokenized_docs:
+    :param data_processed: preprocessed data set used to calculated word embeddings
+    :param vocab: vocabulary of the preprocessed data set
+    :param tokenized_docs: tokenized version of the training data set
+    :param test_tokenized_docs: tokenized version of the test data set
     :return:
     """
-    n_words = len([w for d in all_data_processed for w in d])
-    word_weights = get_word_weights(all_data_processed, vocab, n_words, weight_type='tf')
+    n_words = len([w for d in data_processed for w in d])
+    word_weights = get_word_weights(data_processed, vocab, n_words, weight_type='tf')
 
-    w2v_params = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
-
-    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(all_data_processed, vocab, params=w2v_params)
+    w2v_params_k_components = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5,
+                               "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(data_processed, vocab,
+                                                                params=w2v_params_k_components)
 
     y_topics = {"K=1": [], "K=2": [], "K=3": []}
     y_c_v_model = {"K=1": [], "K=2": [], "K=3": []}
     y_dbs_model = {"K=1": [], "K=2": [], "K=3": []}
     y_npmi_model = {"K=1": [], "K=2": [], "K=3": []}
 
-    test_y_c_v_model = {1: [], "K=2": [], "K=3": []}
-    test_y_npmi_model = {1: [], "K=2": [], "K=3": []}
+    test_y_c_v_model = {"K=1": [], "K=2": [], "K=3": []}
+    test_y_npmi_model = {"K=1": [], "K=2": [], "K=3": []}
 
     x = [x for x in range(50, 100, 10)] + [95]
 
     for sim in x:
 
         graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=0.8, percentile_cutoff=sim)
-
         components_all = apxa.k_components(graph)
 
-        for k_component in ["K=3", "K=2", "K=3"]:
+        for k_component in ["K=1", "K=2", "K=3"]:
 
             temp_k_dict = {"K=1": 1, "K=2": 2, "K=3": 3}
             components = components_all[temp_k_dict[k_component]]
@@ -308,6 +240,8 @@ def k_components_model(all_data_processed, vocab, tokenized_docs, test_tokenized
                                     reverse=True) for c in corpus_clusters]
 
             if len(cluster_words) <= 2:
+                # topic model did not find enough topics
+                # -1000.0 is the NaN value used in the charts, these values will not be shown in the charts
                 cs_c_v = -1000.0
                 dbs = -1000.0
                 cs_npmi = -1000.0
@@ -321,7 +255,7 @@ def k_components_model(all_data_processed, vocab, tokenized_docs, test_tokenized
                 # intrinsic evaluation
                 cs_c_v = c_v_coherence_score(tokenized_docs, cluster_words)
                 dbs = davies_bouldin_index(cluster_embeddings)
-                cs_npmi = npmi_coherence_score(all_data_processed, cluster_words, len(cluster_words))
+                cs_npmi = npmi_coherence_score(data_processed, cluster_words, len(cluster_words))
 
                 # extrinsic evaluation
                 cs_c_v_test = c_v_coherence_score(test_tokenized_docs, cluster_words)
@@ -336,72 +270,48 @@ def k_components_model(all_data_processed, vocab, tokenized_docs, test_tokenized
             test_y_c_v_model[k_component].append(cs_c_v_test)
             test_y_npmi_model[k_component].append(cs_npmi_test)
 
-    save_model_scores(models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
+    save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
                       model_npmi_test_scores=test_y_npmi_model, filename_prefix='k-components', 
                       model_dbs_scores=y_dbs_model)
+
+
+def bert_topic_model(bert_embedding_type: str, all_data_processed: list, vocab: list, test_tokenized_docs: list,
+                     x: list = None):
     """
-    # c_v coherence score
-    ys = [l for l in y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (c_v)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
-    fig.savefig("visuals/graph_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
+    bert_topic_model fetched the predefined bert embeddings, clusters them and performs
 
-    # npmi coherence score
-    ys = [l for l in y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (NMPI)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
-    fig.savefig("visuals/graph_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # dbs score
-    ys = [l for l in y_dbs_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Davies–Bouldin index",
-                          color_legends=["K=1", "K=2", "K=3"], type='dbs')
-    fig.savefig("visuals/graph_dbi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # c_v coherence score - extrinsic
-    ys = [l for l in test_y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (c_v)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
-    fig.savefig("visuals/extrinsic_graph_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # u_mass coherence score - extrinsic
-    ys = [l for l in test_y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Similarity Percentile", y_label="Coherence Score (NMPI)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
-    fig.savefig("visuals/extrinsic_graph_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    for m in list(y_topics.keys()):
-        vis_topics_score(y_topics[m], y_c_v_model[m], y_npmi_model[m],
-                         test_y_c_v_model[m], test_y_npmi_model[m],
-                         "visuals/graph_clusters_eval_" + str(m) + ".txt", dbs_scores=y_dbs_model[m])
-    """
-
-
-def bert_visualization(all_data_processed: list, vocab: list, test_tokenized_docs: list, x: list = None):
-    """
-
+    :param bert_embedding_type:
     :param all_data_processed:
     :param vocab:
     :param test_tokenized_docs:
-    :param x:
-    :return:
+    :param x: list of number of topics, default: list(range(2, 22, 2))
     """
-    # normal_ll: "data/all_vocab_emb_dict_11_512.pickle"
-    # normal_12: "all_vocab_emb_dict_12"
+    bert_file_names = {
+        'normal_ll': "all_vocab_emb_dict_11_512",
+        'normal_12': "all_vocab_emb_dict_12",
+        'preprocessed_sentence_11': "train_vocab_emb_dict_11_512_processed",
+        'preprocessed_sentence_12': "train_vocab_emb_dict_12_512_processed",
+        'preprocessed_seg_11': "train_vocab_emb_dict_11_512_processedSEG_words",
+        'preprocessed_seg_12': "train_vocab_emb_dict_12_512_processedSEG_words"
 
-    # preprocessed_sentence_11: train_vocab_emb_dict_11_512_processed
-    # preprocessed_sentence_12: train_vocab_emb_dict_12_512_processed
+    }
 
-    # preprocessed_seg_11: train_vocab_emb_dict_11_512_processedSEG_words
-    # preprocessed_seg_12: train_vocab_emb_dict_12_512_processedSEG_words
-    with open("data/train_vocab_emb_dict_11_512_processedSEG_words.pickle", "rb") as f:
+    assert bert_embedding_type in bert_file_names.keys()
+    if x is None:
+        x = list(range(2, 22, 2))
+
+    else:
+        assert isinstance(x, list)
+
+    # train_vocab_emb_dict_11_512_processedSEG_words
+    with open("data/" + bert_file_names[bert_embedding_type] + ".pickle", "rb") as f:
         all_vocab_emb_dict = pickle.load(f)
 
     all_vocab_emb_dict_words = all_vocab_emb_dict.keys()
     vocab_bert_embeddings = []
     new_vocab = []
-    min_count = 80 # 100
+    min_count = 80  # 100
     for word in vocab:
 
         if word in all_vocab_emb_dict_words:
@@ -415,12 +325,6 @@ def bert_visualization(all_data_processed: list, vocab: list, test_tokenized_doc
                 continue
     assert all(len(embd) == 768 for embd in vocab_bert_embeddings)
 
-    if x is None:
-        x = list(range(2, 22, 2))
-
-    else:
-        assert isinstance(x, list)
-
     words, word_embeddings = (new_vocab, vocab_bert_embeddings)
 
     y_c_v_model = {"K-Means": [], "Agglomerative": [], 'HDBSCAN': []}
@@ -432,26 +336,10 @@ def bert_visualization(all_data_processed: list, vocab: list, test_tokenized_doc
 
     y_topics = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
 
-    labels, probabilities = hdbscan_clustering(word_embeddings, min_cluster_size=6, do_dim_reduction=False) # True
-
-    temp_cluster_words = [[] for _ in range(len(set(labels)) - 1)]
-    temp_cluster_embeddings = [[] for _ in range(len(set(labels)) - 1)]
-    for i, label in enumerate(labels):
-
-        if label == -1:
-            # noise
-            continue
-        temp_cluster_words[label].append([words[i], probabilities[i]])
-        temp_cluster_embeddings[label].append(word_embeddings[i])
-
-    hdbscan_clusters_words = []
-    hdbscan_clusters_words_embeddings = []
-    for i_c, c in enumerate(temp_cluster_words):
-        c_sorted_indices = sorted(range(len(c)), key=lambda i_w: c[i_w][1], reverse=True)
-
-        hdbscan_clusters_words.append([c[i][0] for i in c_sorted_indices[:30]])
-        hdbscan_clusters_words_embeddings.append([temp_cluster_embeddings[i_c][i]
-                                          for i in c_sorted_indices[:30]])
+    _, _, hdbscan_clusters_words, hdbscan_clusters_words_embeddings = hdbscan_clustering(words, word_embeddings,
+                                                                                         min_cluster_size=6,
+                                                                                         do_dim_reduction=False,
+                                                                                         n_words=30)
     print("HDBSCAN len: " + str(len(hdbscan_clusters_words)))
     for k in x:
 
@@ -481,7 +369,7 @@ def bert_visualization(all_data_processed: list, vocab: list, test_tokenized_doc
             topic_vector_cluster_words = []
             topic_vector_cluster_words_embeddings = []
             for t_vector in topic_vectors:
-                sim_indices = get_most_similar_indices(t_vector, word_embeddings, n_most_similar=30)
+                sim_indices = get_nearest_indices(t_vector, word_embeddings, n_nearest=30)
 
                 topic_vector_cluster_words.append([words[i_w] for i_w in sim_indices])
                 topic_vector_cluster_words_embeddings.append([word_embeddings[i_w] for i_w in sim_indices])
@@ -502,7 +390,7 @@ def bert_visualization(all_data_processed: list, vocab: list, test_tokenized_doc
                                                len(topic_vector_cluster_words))
 
                 test_cs_c_v = c_v_coherence_score(test_tokenized_docs, topic_vector_cluster_words)
-                test_cs_npmi = npmi_coherence_score(test_tokenized_docs,topic_vector_cluster_words, 
+                test_cs_npmi = npmi_coherence_score(test_tokenized_docs, topic_vector_cluster_words,
                                                     len(topic_vector_cluster_words))
 
             y_c_v_model[cluster_type].append(cs_c_v)
@@ -514,45 +402,7 @@ def bert_visualization(all_data_processed: list, vocab: list, test_tokenized_doc
 
             y_topics[cluster_type].append(topic_vector_cluster_words)
 
-    save_model_scores(models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
+    save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
                       model_npmi_test_scores=test_y_npmi_model, filename_prefix='BERT',
                       model_dbs_scores=y_dbs_model)
-    """
-    # c_v coherence score
-    ys = [l for l in y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_v')
-    fig.savefig("visuals/w_space_c_v_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # c_npmi coherence score
-    ys = [l for l in y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='c_npmi')
-    fig.savefig("visuals/w_space_c_npmi_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # dbs score
-    ys = [l for l in y_dbs_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Davies–Bouldin index",
-                          color_legends=["K-Means", "Agglomerative", "HDBSCAN"], type='dbs')
-    fig.savefig("visuals/w_space_dbi_bert_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # c_v coherence score - extrinsic
-    ys = [l for l in test_y_c_v_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_v')
-    fig.savefig("visuals/extrinsic_graph_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    # u_mass coherence score - extrinsic
-    ys = [l for l in test_y_npmi_model.values()]
-    _, fig = scatter_plot(x, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
-                          color_legends=["K=1", "K=2", "K=3"], type='c_npmi')
-    fig.savefig("visuals/extrinsic_graph_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
-
-    for m in list(y_topics.keys()):
-        vis_topics_score(topics_list=y_topics[m], c_v_scores=y_c_v_model[m], nmpi_scores=y_npmi_model[m],
-                         test_c_v_scores=test_y_c_v_model[m],
-                         test_nmpi_scores=test_y_npmi_model[m],
-                         filename="visuals/w_space_clusters_eval_" + str(m) + ".txt",
-                         dbs_scores=y_dbs_model[m])
-    """

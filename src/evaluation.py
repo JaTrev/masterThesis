@@ -22,7 +22,6 @@ def c_v_coherence_score(processed_data: list, topic_words: list, cs_type: str = 
     if len(topic_words) == 1:
         return -1000
     dictionary = corpora.Dictionary(processed_data)
-    corpus = [dictionary.doc2bow(text) for text in processed_data]
 
     dictionary_words = dictionary.token2id
     new_topics = []
@@ -38,7 +37,6 @@ def c_v_coherence_score(processed_data: list, topic_words: list, cs_type: str = 
         new_topics.append(temp_topic)
 
     cm = CoherenceModel(topics=new_topics,
-                        # corpus=corpus,
                         dictionary=dictionary,
                         texts=processed_data,
                         coherence=cs_type,
@@ -47,29 +45,31 @@ def c_v_coherence_score(processed_data: list, topic_words: list, cs_type: str = 
     return float("{:.2f}".format(cm.get_coherence()))
 
 
-def npmi_coherence_score(documents: list, topic_words_large: list, ntopics: int):
+def npmi_coherence_score(preprocessed_segments: list, topic_words_large: list, n_topics: int) -> float:
     """
     Average NPMI from:
+
     Tired of Topic Models? Clusters of Pretrained Word Embeddings Make for Fast and Good Topics too!
-    by Suzanna Sia et al
+    by Suzanna Sia et al.
     Github: https://github.com/adalmia96/Cluster-Analysis
-    :param topic_words:
-    :param ntopics:
-    :param word_doc_counts:
-    :param nfiles:
-    :return:
+
+    :param preprocessed_segments: list of preprocessed segments
+    :param topic_words_large:
+    :param n_topics: number of topics
+
+    :return: NPMI score
     """
 
-    if ntopics == 1:
+    if n_topics == 1:
         return -1000
 
     eps = 10**(-12)
-    n_docs = len(documents)
+    n_docs = len(preprocessed_segments)
     topic_words = [t[:10] for t in topic_words_large]
 
     word_to_doc = {}
     all_cluster_words = [w for t in topic_words for w in t]
-    for i_d, doc in enumerate(documents):
+    for i_d, doc in enumerate(preprocessed_segments):
 
         for w in all_cluster_words:
 
@@ -83,44 +83,25 @@ def npmi_coherence_score(documents: list, topic_words_large: list, ntopics: int)
                     word_to_doc[w].add(i_d)
 
     all_topics = []
-    for k in range(ntopics):
-        word_pair_counts = 0
+    for k in range(n_topics):
         topic_score = []
 
-        ntopw = len(topic_words[k])
+        n_top_w = len(topic_words[k])
 
-        for i in range(ntopw-1):
-            for j in range(i+1, ntopw):
+        for i in range(n_top_w-1):
+            for j in range(i+1, n_top_w):
                 w1 = topic_words[k][i]
                 w2 = topic_words[k][j]
 
                 w1_dc = len(word_to_doc.get(w1, set()))
-                # len(word_doc_counts.get(w1, set()))
 
                 w2_dc = len(word_to_doc.get(w2, set()))
-                # len(word_doc_counts.get(w2, set()))
 
                 w1w2_dc = len(word_to_doc.get(w1, set()) & word_to_doc.get(w2, set()))
-                # len(word_doc_counts.get(w1, set()) & word_doc_counts.get(w2, set()))
-
-                # what we had previously:
-                #pmi_w1w2 = np.log(((w1w2_dc * nfiles) + eps) / ((w1_dc * w2_dc) + eps))
 
                 # Correct eps:
                 pmi_w1w2 = np.log((w1w2_dc * n_docs) / ((w1_dc * w2_dc) + eps) + eps)
-                npmi_w1w2 = pmi_w1w2 / (- np.log( (w1w2_dc)/n_docs + eps))
-
-                # Sanity check Which is equivalent to this:
-                #if w1w2_dc ==0:
-                #    npmi_w1w2 = -1
-                #else:
-                    #pmi_w1w2 = np.log( (w1w2_dc * nfiles)/ (w1_dc*w2_dc))
-                    #npmi_w1w2 = pmi_w1w2 / (-np.log(w1w2_dc/nfiles))
-
-                #if npmi_w1w2>1 or npmi_w1w2<-1:
-                #    print("NPMI score not bounded for:", w1, w2)
-                #    print(npmi_w1w2)
-                #    sys.exit(1)
+                npmi_w1w2 = pmi_w1w2 / (- np.log(w1w2_dc/n_docs + eps))
 
                 topic_score.append(npmi_w1w2)
 
@@ -153,17 +134,53 @@ def davies_bouldin_index(topic_word_embeddings: list) -> float:
     return float("{:.2f}".format(sklearn.metrics.davies_bouldin_score(temp_topic_words_embeddings, temp_labels)))
 
 
-def ari_score(labels_true, labels_pred):
+def ari_score(labels_true, labels_pred) -> float:
+    """
+    ari_score calculates the ARI score
+
+    :param labels_true: list of true topic labels
+    :param labels_pred: list of predicted topics
+
+    :return: ARO score
+    """
     return adjusted_rand_score(labels_true, labels_pred)
 
 
-def acc_score(labels_true, labels_pred, normalize=True, sample_weight=None):
+def acc_score(labels_true, labels_pred, normalize=True, sample_weight=None) -> float:
+    """
+    acc_score calculates the ACC score
+
+    :param labels_true: list of true topic labels
+    :param labels_pred: list of predicted topics
+    :param normalize: normalization flag
+    :param sample_weight: sample weight list
+
+    :return: ACC score
+    """
     return accuracy_score(labels_true, labels_pred, normalize, sample_weight)
 
 
-def ami_score(labels_true, labels_pred, average_method='arithmetic'):
+def ami_score(labels_true, labels_pred, average_method='arithmetic') -> float:
+    """
+    ami_score calculates the AMI score
+
+    :param labels_true: list of true topic labels
+    :param labels_pred: list of predicted topics
+    :param average_method: how to compute normalizer in denominator
+
+    :return: AMI score
+    """
     return adjusted_mutual_info_score(labels_true, labels_pred, average_method=average_method)
 
 
-def nmi_score(labels_true, labels_pred, average_method='arithmetic'):
+def nmi_score(labels_true, labels_pred, average_method='arithmetic') -> float:
+    """
+    nmi_score calculates the NMI score
+
+    :param labels_true: list of true topic labels
+    :param labels_pred: list of predicted topics
+    :param average_method: how to compute normalizer in denominator
+
+    :return: NMI score
+    """
     return normalized_mutual_info_score(labels_true, labels_pred, average_method=average_method)
