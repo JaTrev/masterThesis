@@ -49,7 +49,7 @@ def vis_classification_score(topics_list: list, model_type: str, doc_labels_true
             else:
                 true_labels = doc_labels_true
 
-            assert len(true_labels) == len(doc_topics_pred_list)
+            assert len(true_labels) == len(doc_topics_pred_list[i])
             myFile.write("ari score: " + ": " + str(ari_score(true_labels, doc_topics_pred_list[i])) + '\n')
             myFile.write("ami score: " + ": " + str(ami_score(true_labels, doc_topics_pred_list[i])) + '\n')
             myFile.write("nmi score: " + ": " + str(nmi_score(true_labels, doc_topics_pred_list[i])) + '\n')

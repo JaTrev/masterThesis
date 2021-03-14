@@ -8,6 +8,15 @@ import argparse
 
 def main_fct(preprocessed_data_set: str, topic_model_type: str, misc_prints: str,
              bert_embedding_type: str = "normal_ll"):
+    """
+    main function performing all topic models
+
+    :param preprocessed_data_set: name of preprocessed data set
+    :param topic_model_type: name of topic model
+    :param misc_prints: misc. print functions
+    :param bert_embedding_type: BERT embedding type
+    :return:
+    """
 
     assert preprocessed_data_set in ["JN", "FP"]
     assert (topic_model_type in ["Baseline", "RRW", "TVS", "k-components", "BERT", "avg_w2v", "doc2vec"]
@@ -30,13 +39,16 @@ def main_fct(preprocessed_data_set: str, topic_model_type: str, misc_prints: str
         baseline_topic_model(data_processed, vocab, tokenized_docs, data_processed_labels, test_tokenized_docs)
 
     elif topic_model_type == "RRW":
-        word2vec_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs, topic_vector_flag=False)
+        word2vec_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs,
+                             data_set_name=preprocessed_data_set, topic_vector_flag=False)
 
     elif topic_model_type == "TVS":
-        word2vec_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs, topic_vector_flag=True)
+        word2vec_topic_model(data_processed, vocab, tokenized_docs, test_tokenized_docs,
+                             data_set_name=preprocessed_data_set, topic_vector_flag=True)
 
     elif topic_model_type == "k-components":
-        k_components_model(data_processed, vocab, tokenized_docs, test_tokenized_docs)
+        k_components_model(data_processed, vocab, tokenized_docs, test_tokenized_docs,
+                           data_set_name=preprocessed_data_set)
 
     elif topic_model_type == "BERT":
         bert_topic_model(bert_embedding_type, data_processed, vocab, test_tokenized_docs)
@@ -89,6 +101,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--mp', dest='misc_prints', type=str, required=False, default=None,
                         help="define the miscellaneous print that should be performed")
+
     parser.add_argument('--bert', dest='bert_type', type=str, required=False, default=None,
                         help="define the BERT embedding type")
 

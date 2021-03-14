@@ -1,6 +1,8 @@
 from src.vectorization import *
 from src.clustering import *
 from src.graphs import *
+from pathlib import Path
+import pickle
 
 
 def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
@@ -50,8 +52,28 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
                   'ns_exponent': 0.75, "dm": 0, "dbow_words": 1}
         min_cluster_size = 8
 
-    doc_data, short_true_labels, doc_embeddings, vocab_words, vocab_embeddings = semantic_space_embeddings(
-        data_processed, segment_labels_true, vocab, segment_embedding_type, params)
+    dict_file = "semantic-space-dict-" + segment_embedding_type + "-" + data_set_name + ".pickle"
+    if Path("data/" + dict_file).is_file():
+
+        print("using pre-calculated file")
+        with open("data/" + dict_file, "rb") as myFile:
+            temp_dict = pickle.load(myFile)
+
+            doc_data = temp_dict['doc_data']
+            short_true_labels = temp_dict['short_true_labels']
+            doc_embeddings = temp_dict['doc_embeddings']
+            vocab_words = temp_dict['vocab_words']
+            vocab_embeddings = temp_dict['vocab_embeddings']
+
+    else:
+
+        doc_data, short_true_labels, doc_embeddings, vocab_words, vocab_embeddings = semantic_space_embeddings(
+            data_processed, segment_labels_true, vocab, segment_embedding_type, params)
+
+        temp_dict ={'doc_data': doc_data, 'short_true_labels': short_true_labels, 'doc_embeddings': doc_embeddings,
+                    'vocab_words': vocab_words, 'vocab_embeddings': vocab_embeddings}
+        with open("data/" + dict_file, "wb") as myFile:
+            pickle.dump(temp_dict, myFile)
 
     y_topics = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
@@ -139,7 +161,7 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
 
     save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
-                      model_npmi_test_scores=test_y_npmi_model, filename_prefix='BL')
+                      model_npmi_test_scores=test_y_npmi_model, filename_prefix='JESS')
 
     for m in list(y_topics.keys()):
         vis_classification_score(y_topics[m], m, doc_topics_true_model[m], doc_topics_pred_model[m],

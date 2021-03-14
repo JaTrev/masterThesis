@@ -4,14 +4,14 @@ from src.graphs import *
 from src.misc import save_model_scores
 import pickle
 from networkx.algorithms import approximation as apxa
-
+from pathlib import Path
 
 w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
               'ns_exponent': 0.75}
 
 
 def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
-                         x: list = None, topic_vector_flag: bool = False):
+                         data_set_name: str, x: list = None, topic_vector_flag: bool = False):
     """
     word2vec_topic_model performs topic modeling in word space using Word2Vec embeddings.
     The function produces a range of files that list the resulting topics and visualize the model's performance.
@@ -20,6 +20,7 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
     :param vocab: vocabulary of the preprocessed data set
     :param tokenized_docs: tokenized version of the training data set
     :param test_tokenized_docs: tokenized version of the test data set
+    :param data_set_name: preprocessed data set used
     :param x: list of number of topics to iterate over, default: list(range(2, 22, 2))
     :param topic_vector_flag: flag used to switch between TVS model and RRW and, default: False (RRW model)
 
@@ -34,6 +35,8 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
     else:
         assert isinstance(x, list)
 
+    assert data_set_name in ["JN", "FP"]
+
     y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_dbs_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
@@ -41,7 +44,22 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
     test_y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_topics = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
 
-    words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
+    # words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
+    w2v_model_file = "w2v_model-" + data_set_name + ".pickle"
+    if Path("data/" + w2v_model_file).is_file():
+
+        print("using pre-calculated w2v model")
+        with open("data/" + w2v_model_file, "rb") as myFile:
+            w2v_model = pickle.load(myFile)
+
+            words = [w for w in vocab if w in w2v_model.wv.index2word]
+            word_embeddings = [w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
+
+    else:
+        words, word_embeddings, w2v_model = get_word_vectors(data_processed, vocab, params=w2v_params)
+
+        with open("data/"+ w2v_model_file, "wb") as myFile:
+            pickle.dump(w2v_model, myFile)
 
     _, _, hdbscan_clusters_words, hdbscan_clusters_words_embeddings = hdbscan_clustering(words, word_embeddings,
                                                                                          min_cluster_size=6,
@@ -107,92 +125,8 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
                       model_dbs_scores=y_dbs_model)
 
 
-def topic_vector_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
-                       x: list = None):
-    """
-    topic_vector_model is not used but performance the TVS model,
-    resulting in numbers file that list the resulting topics and visualize their performance.
-
-    :param data_processed: preprocessed data set used to calculated word embeddings
-    :param vocab: vocabulary of the preprocessed data set
-    :param tokenized_docs: tokenized version of the training data set
-    :param test_tokenized_docs: tokenized version of the test data set
-    :param x: list of number of topics to iterate over, default: list(range(2, 22, 2))
-    """
-    clustering_weight_type = 'tf'
-
-    if x is None:
-        x = list(range(2, 22, 2))
-
-    else:
-        assert isinstance(x, list)
-
-    words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
-
-    y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-    y_dbs_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-    y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-
-    test_y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-    test_y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-
-    y_topics = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
-
-    _, _, hdbscan_clusters_words, hdbscan_clusters_words_embeddings = hdbscan_clustering(words, word_embeddings,
-                                                                                         min_cluster_size=6,
-                                                                                         do_dim_reduction=False,
-                                                                                         n_words=10)
-
-    for k in x:
-
-        for cluster_type in ["K-Means", "Agglomerative", "HDBSCAN"]:
-
-            if cluster_type == "HDBSCAN":
-                clusters_words = hdbscan_clusters_words
-                clusters_words_embeddings = hdbscan_clusters_words_embeddings
-
-            else:
-                assert cluster_type in ["K-Means", "Agglomerative"]
-                if cluster_type == "K-Means":
-                    clustering_params = {'n_clusters': k, 'random_state': 42, }
-                else:
-                    clustering_params = {'n_clusters': k}
-
-                clusters_words, clusters_words_embeddings = get_word_clusters(
-                    data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
-                    params=clustering_params, clustering_weight_type=clustering_weight_type,
-                    ranking_weight_type=None)
-
-            topic_vectors = [get_topic_vector(c) for c in clusters_words_embeddings]
-
-            # get topics based on topic vectors
-            topic_vector_cluster_words = []
-            topic_vector_cluster_words_embeddings = []
-            for t_vector in topic_vectors:
-                sim_indices = get_nearest_indices(t_vector, word_embeddings)
-
-                topic_vector_cluster_words.append([words[i_w] for i_w in sim_indices])
-                topic_vector_cluster_words_embeddings.append([word_embeddings[i_w] for i_w in sim_indices])
-
-            y_topics[cluster_type].append(topic_vector_cluster_words)
-
-            # intrinsic coherence
-            y_c_v_model[cluster_type].append(c_v_coherence_score(tokenized_docs, topic_vector_cluster_words))
-            y_npmi_model[cluster_type].append(npmi_coherence_score(tokenized_docs, topic_vector_cluster_words,
-                                                                   len(topic_vector_cluster_words)))
-            y_dbs_model[cluster_type].append(davies_bouldin_index(topic_vector_cluster_words_embeddings))
-
-            # extrinsic coherence
-            test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_docs, clusters_words))
-            test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_docs, clusters_words,
-                                                                        len(clusters_words)))
-
-    save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
-                      model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
-                      model_npmi_test_scores=test_y_npmi_model, filename_prefix='TVS', model_dbs_scores=y_dbs_model)
-
-
-def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list):
+def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_docs: list,
+                       data_set_name: str):
     """
     k_components_model is used to perform topic model on the word embedding graph using k-components algorithm.
     This function uses the k-components approximation function from the Networkx library
@@ -201,15 +135,31 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
     :param vocab: vocabulary of the preprocessed data set
     :param tokenized_docs: tokenized version of the training data set
     :param test_tokenized_docs: tokenized version of the test data set
+    :param data_set_name: name of the preprocessed data set used
     :return:
     """
     n_words = len([w for d in data_processed for w in d])
     word_weights = get_word_weights(data_processed, vocab, n_words, weight_type='tf')
 
-    w2v_params_k_components = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5,
-                               "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
-    vocab_words, vocab_embeddings, w2v_model = get_word_vectors(data_processed, vocab,
-                                                                params=w2v_params_k_components)
+    w2v_model_file = "w2v_model-k_components-" + data_set_name + ".pickle"
+    if Path("data/" + w2v_model_file).is_file():
+
+        print("using pre-calculated w2v model")
+        with open("data/" + w2v_model_file, "rb") as myFile:
+            w2v_model = pickle.load(myFile)
+
+            vocab_words = [w for w in vocab if w in w2v_model.wv.index2word]
+            vocab_embeddings = [w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)]
+                                for w in vocab_words]
+
+    else:
+        w2v_params_k_components = {"min_c": 50, "win": 15, "negative": 0, "sample": 1e-5,
+                                   "hs": 1, "epochs": 400, "sg": 1, 'seed': 42}
+        vocab_words, vocab_embeddings, w2v_model = get_word_vectors(data_processed, vocab,
+                                                                    params=w2v_params_k_components)
+
+        with open("data/" + w2v_model_file, "wb") as myFile:
+            pickle.dump(w2v_model, myFile)
 
     y_topics = {"K=1": [], "K=2": [], "K=3": []}
     y_c_v_model = {"K=1": [], "K=2": [], "K=3": []}
@@ -288,7 +238,7 @@ def bert_topic_model(bert_embedding_type: str, all_data_processed: list, vocab: 
     :param x: list of number of topics, default: list(range(2, 22, 2))
     """
     bert_file_names = {
-        'normal_ll': "all_vocab_emb_dict_11_512",
+        'normal_ll': "all_vocab_emb_dict_11",
         'normal_12': "all_vocab_emb_dict_12",
         'preprocessed_sentence_11': "train_vocab_emb_dict_11_512_processed",
         'preprocessed_sentence_12': "train_vocab_emb_dict_12_512_processed",
