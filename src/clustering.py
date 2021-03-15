@@ -3,7 +3,6 @@ from src.misc import *
 import numpy as np
 from sklearn.decomposition import NMF
 import hdbscan
-import umap
 from typing import Tuple
 
 
@@ -67,8 +66,7 @@ def kmeans_clustering(word_embeddings: list, word_weights: list = None, params: 
     return model.fit_predict(word_embeddings, word_weights)
 
 
-def hdbscan_clustering(words: list, embeddings: list, min_cluster_size: int = 10, n_neighbors: int = 15,
-                       n_components: int = 5, do_dim_reduction=False, n_words: int = 30) \
+def hdbscan_clustering(words: list, embeddings: list, min_cluster_size: int = 10,  n_words: int = 30) \
         -> Tuple[list, list, list, list]:
     """
     hdbscan_clustering performs HDBSCAN clusterings on the list of embeddings
@@ -76,9 +74,6 @@ def hdbscan_clustering(words: list, embeddings: list, min_cluster_size: int = 10
     :param words: list of words
     :param embeddings: list of embeddings of the words
     :param min_cluster_size: minimum cluster size
-    :param n_neighbors: number of neighbors (used in UMAP)
-    :param n_components: number of components (used in UMAP)
-    :param do_dim_reduction: flag for UMAP
     :param n_words: number of topic representatives
 
     :return:
@@ -90,11 +85,6 @@ def hdbscan_clustering(words: list, embeddings: list, min_cluster_size: int = 10
     cluster.labels_, cluster.probabilities_, hdbscan_clusters_words, hdbscan_clusters_words_embeddings
     """
     assert len(words) == len(embeddings)
-
-    if do_dim_reduction:
-        umap_model = umap.UMAP(n_neighbors=n_neighbors, n_components=n_components,
-                               metric='cosine', random_state=123).fit(embeddings)
-        embeddings = umap_model.embedding_
 
     cluster = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, metric='euclidean',
                               cluster_selection_method='eom').fit(embeddings)

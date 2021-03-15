@@ -17,6 +17,8 @@ def baseline_topic_model(data_processed: list, vocab: list, tokenized_segments: 
     :param x: list of number of topics
 
     """
+
+    # create x-values (number of topics list)
     if x is None:
         x = list(range(2, 22, 2))
     else:
@@ -25,14 +27,16 @@ def baseline_topic_model(data_processed: list, vocab: list, tokenized_segments: 
     true_topic_amount = len(set(seg_labels_true))
 
     y_topics = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
-
     y_c_v_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
     y_npmi_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
     test_y_c_v_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
     test_y_npmi_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
     doc_topics_pred_model = {'NMF TF': [], 'NMF TF-IDF': [], 'LDA': []}
+
+    # iterate over x values (number of topics)
     for k in x:
 
+        # iterate over all baseline topic models
         for m in list(y_topics.keys()):
 
             if m == 'NMF TF':
@@ -48,16 +52,20 @@ def baseline_topic_model(data_processed: list, vocab: list, tokenized_segments: 
 
             y_topics[m].append(topics)
 
-            # topic evaluation
+            # topic evaluation scores
             # intrinsic scores
             y_c_v_model[m].append(c_v_coherence_score(tokenized_segments, topics, cs_type='c_v'))
             y_npmi_model[m].append(npmi_coherence_score(tokenized_segments, topics, len(topics)))
 
-            # extrinsic scores
-            test_y_c_v_model[m].append(c_v_coherence_score(test_tokenized_segments, topics, cs_type='c_v'))
-            test_y_npmi_model[m].append(npmi_coherence_score(test_tokenized_segments, topics, len(topics)))
+            if test_tokenized_segments is not None:
+                # extrinsic scores
+                test_y_c_v_model[m].append(c_v_coherence_score(test_tokenized_segments, topics, cs_type='c_v'))
+                test_y_npmi_model[m].append(npmi_coherence_score(test_tokenized_segments, topics, len(topics)))
+            else:
+                test_y_c_v_model[m].append(-1000.0)
+                test_y_npmi_model[m].append(-1000.0)
 
-            # save predicted topics assigned for classification evaluation
+            # save predicted topics for classification evaluation
             doc_topics_pred_model[m].append(doc_topics_pred)
 
             if k == true_topic_amount:
@@ -68,6 +76,8 @@ def baseline_topic_model(data_processed: list, vocab: list, tokenized_segments: 
                       model_npmi_test_scores=test_y_npmi_model, filename_prefix='BL')
 
     for m in list(y_topics.keys()):
+
+        # save classification scores for every model
         vis_classification_score(y_topics[m], m, seg_labels_true, doc_topics_pred_model[m],
                                  filename="visuals/classification_scores_" + str(m) + ".txt",
                                  multiple_true_label_set=False)

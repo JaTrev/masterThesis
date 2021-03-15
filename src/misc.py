@@ -135,7 +135,7 @@ def save_model_scores(x_values: list, models: list, model_topics: dict, model_c_
                           color_legends=models, score_type='c_npmi')
     fig.savefig("visuals/" + filename_prefix + "_extrinsic_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
 
-    # save all topics with their associated scores
+    # save all topics with their scores
     for m in models:
 
         if model_dbs_scores is None:

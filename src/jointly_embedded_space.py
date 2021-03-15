@@ -21,32 +21,33 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
     :param true_topic_amount: true number of topics (must be included in x)
 
     """
-
     # main extrinsic evaluation metric: ARI
     # https://stats.stackexchange.com/questions/381223/evaluation-of-clustering-method
 
+    assert data_set_name in ["JN", "FP"]
+
+    # create x-values (number of topics list)
     if x is None:
         x = list(range(2, 22, 2))
         assert true_topic_amount in x
-
     else:
         assert isinstance(x, list)
 
-    assert data_set_name in ["JN", "FP"]
-
+    # Word2Vec and clustering parameters
     if segment_embedding_type in ["w2v_avg", "w2v_sum"]:
         params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
                   'ns_exponent': 0.75}
 
         if data_set_name == "FP":
-            # fully preprocessed: 9
+            # Fully Preprocessed: 9
             min_cluster_size = 9
 
         else:
-            # just nouns: 7
+            # Just Nouns: min cluster size =  7
             min_cluster_size = 7
 
     else:
+        # Doc2Vec and clustering parameters
         assert segment_embedding_type == "doc2vec"
         params = {"min_c": 10, "win": 5, "negative": 30, "sample": 1e-5, "hs": 0, "epochs": 400, 'seed': 42,
                   'ns_exponent': 0.75, "dm": 0, "dbow_words": 1}
@@ -78,18 +79,16 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
     y_topics = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-
     test_y_c_v_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     test_y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
-
     doc_topics_pred_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     doc_topics_true_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
 
+    # perform HDBSCAN clustering
     hdbscan_clustering_model = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, metric='euclidean',
                                                cluster_selection_method='eom').fit(doc_embeddings)
     labels = hdbscan_clustering_model.labels_
 
-    print("HDBSCAN #labels: " + str(set(labels)))
     hdbscan_clusters_docs_embeddings = [[] for _ in range(len(set(labels)) - 1)]
     hdbscan_labels_predict = []
     hdbscan_true_labels = []
@@ -102,12 +101,13 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
         hdbscan_true_labels.append(short_true_labels[i])
         hdbscan_labels_predict.append(label)
 
+    # iterate over x-values (number of topics list)
     for k in x:
 
-        for cluster_type in ["K-Means", "Agglomerative", "HDBSCAN"]:
+        # iterate over clustering methods
+        for cluster_type in y_topics.keys():
 
             if cluster_type == "HDBSCAN":
-
                 clusters_docs_embeddings = hdbscan_clusters_docs_embeddings
                 labels_predict = hdbscan_labels_predict
                 true_labels = hdbscan_true_labels
@@ -124,12 +124,13 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
 
                 true_labels = short_true_labels
 
+            # calulate topic vectors and use cosine similarity to find topic representatives
             topic_embeddings = []
             topics_words = []
             topics_words_embeddings = []
             for docs_embeddings in clusters_docs_embeddings:
-                t_embedding = np.average(docs_embeddings, axis=0)
 
+                t_embedding = np.average(docs_embeddings, axis=0)
                 t_embedding_sim_matrix = cosine_similarity(t_embedding.reshape(1, -1), vocab_embeddings)[0]
                 most_sim_ids = np.argsort(t_embedding_sim_matrix, axis=None)[:: -1]
 
@@ -140,17 +141,23 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
                 topics_words_embeddings.append(t_words_embeddings)
                 topic_embeddings.append(t_embedding)
 
+            # save topics
             y_topics[cluster_type].append(topics_words)
 
-            # intrinsic
+            # topic model evaluation
+            # intrinsic scores
             y_c_v_model[cluster_type].append(c_v_coherence_score(data_processed, topics_words, cs_type='c_v'))
             y_npmi_model[cluster_type].append(npmi_coherence_score(data_processed, topics_words, len(topics_words)))
 
-            # extrinsic
-            test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_segments, topics_words,
-                                                                      cs_type='c_v'))
-            test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_segments, topics_words,
-                                                                        len(topics_words)))
+            # extrinsic scores
+            if test_tokenized_segments is not None:
+                test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_segments, topics_words,
+                                                                          cs_type='c_v'))
+                test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_segments, topics_words,
+                                                                            len(topics_words)))
+            else:
+                test_y_c_v_model[cluster_type].append(-1000.0)
+                test_y_npmi_model[cluster_type].append(-1000.0)
 
             if k == true_topic_amount:
                 label_distribution(true_labels, labels_predict, cluster_type)
@@ -159,10 +166,12 @@ def w_d_clustering(data_processed: list, data_set_name: str, vocab: list,
             doc_topics_pred_model[cluster_type].append(labels_predict)
             doc_topics_true_model[cluster_type].append(true_labels)
 
+    # save clustering scores
     save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
                       model_npmi_test_scores=test_y_npmi_model, filename_prefix='JESS')
 
+    # save classification performance of every model
     for m in list(y_topics.keys()):
         vis_classification_score(y_topics[m], m, doc_topics_true_model[m], doc_topics_pred_model[m],
                                  filename="visuals/classification_scores_" + str(m) + ".txt",
