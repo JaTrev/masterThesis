@@ -93,10 +93,10 @@ if __name__ == "__main__":
     parser.add_argument('--mp', dest='misc_prints', type=str, required=False, default=None,
                         help="define the miscellaneous print that should be performed")
 
-    parser.add_argument('--bert', dest='bert_type', type=str, required=False, default=None,
+    parser.add_argument('--bert', dest='bert_type', type=str, required=False, default="normal_ll",
                         help="define the BERT embedding type")
 
-    parser.add_argument('--test', dest='do_testing', type=bool, required=False, default=False,
+    parser.add_argument('--do_testing', dest='do_testing', required=False, default=False, action='store_true',
                         help="should test data set be used")
     args = parser.parse_args()
 

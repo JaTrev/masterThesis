@@ -264,8 +264,8 @@ def bert_topic_model(bert_embedding_type: str, all_data_processed: list, vocab: 
     :param x: list of number of topics, default: list(range(2, 22, 2))
     """
     bert_file_names = {
-        'normal_ll': "all_vocab_emb_dict_11",
-        'normal_12': "all_vocab_emb_dict_12",
+        'normal_ll': "train_vocab_emb_dict_11",
+        'normal_12': "train_vocab_emb_dict_12",
         'preprocessed_sentence_11': "train_vocab_emb_dict_11_512_processed",
         'preprocessed_sentence_12': "train_vocab_emb_dict_12_512_processed",
         'preprocessed_seg_11': "train_vocab_emb_dict_11_512_processedSEG_words",
