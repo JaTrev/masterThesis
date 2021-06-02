@@ -94,8 +94,10 @@ def get_nearest_indices(embedding, list_embedding, n_nearest: int = 10) -> list:
 
 
 def save_model_scores(x_values: list, models: list, model_topics: dict, model_c_v_scores: dict, model_npmi_scores: dict,
-                      model_c_v_test_scores: dict, model_npmi_test_scores: dict, filename_prefix: str,
-                      model_dbs_scores: dict = None):
+                      model_c_v_test_scores: dict, model_npmi_test_scores: dict, model_u_mass_scores: dict,
+                      model_u_mass_test_scores: dict, filename_prefix: str, execution_time: list,
+                      number_of_nodes: list,
+                      model_dbs_scores: dict = None, x_label: str = "Number of Topics"):
     """
     save_model_scores documents the topic modeling performance
 
@@ -104,47 +106,71 @@ def save_model_scores(x_values: list, models: list, model_topics: dict, model_c_
     :param model_topics: list of list of topics
     :param model_c_v_scores: list of c_v scores for each topic model
     :param model_npmi_scores: list of NPMI scores for each topic model
+    :param model_u_mass_scores: list of u_mass scores for each topic model
+    :param model_u_mass_test_scores: list of u_mass (extrinsic) scores for each topic model
     :param model_c_v_test_scores: list of c_v scores (extrinsic) for each topic model
     :param model_npmi_test_scores: list of NPMI scores (extrinsic) for each topic model
     :param filename_prefix: filename prefix
     :param model_dbs_scores: list of DBS scores for each topic model
-
     """
 
     # c_v coherence score figure - intrinsic
     ys = [l for l in model_c_v_scores.values()]
-    _, fig = scatter_plot(x_values, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+    _, fig = scatter_plot(x_values, ys, x_label=x_label, y_label="Coherence Score (c_v)",
                           color_legends=models, score_type='c_v')
     fig.savefig("visuals/" + filename_prefix + "_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # NPMI coherence score figure - intrinsic
     ys = [l for l in model_npmi_scores.values()]
-    _, fig = scatter_plot(x_values, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+    _, fig = scatter_plot(x_values, ys, x_label=x_label, y_label="Coherence Score (NMPI)",
                           color_legends=models, score_type='c_npmi')
     fig.savefig("visuals/" + filename_prefix + "_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
 
+    # u_mass coherence score figure - intrinsic
+    ys = [l for l in model_u_mass_scores.values()]
+    _, fig = scatter_plot(x_values, ys, x_label=x_label, y_label="Coherence Score (u_mass)",
+                          color_legends=models, score_type='c_u_mass')
+    fig.savefig("visuals/" + filename_prefix + "_c_uMass_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # u_mass coherence score figure - extrinsic
+    ys = [l for l in model_u_mass_test_scores.values()]
+    _, fig = scatter_plot(x_values, ys, x_label=x_label, y_label="Coherence Score (u_mass)",
+                          color_legends=models, score_type='c_u_mass')
+    fig.savefig("visuals/" + filename_prefix + "_extrinsic_c_uMass_vs_k.pdf", bbox_inches='tight', transparent=True)
+
     # c_v coherence score figure - extrinsic
     ys = [l for l in model_c_v_test_scores.values()]
-    _, fig = scatter_plot(x_values, ys, x_label="Number of Topics", y_label="Coherence Score (c_v)",
+    _, fig = scatter_plot(x_values, ys, x_label=x_label, y_label="Coherence Score (c_v)",
                           color_legends=models, score_type='c_v')
     fig.savefig("visuals/" + filename_prefix + "_extrinsic_c_v_vs_k.pdf", bbox_inches='tight', transparent=True)
 
     # NPMI coherence score figure - extrinsic
     ys = [l for l in model_npmi_test_scores.values()]
-    _, fig = scatter_plot(x_values, ys, x_label="Number of Topics", y_label="Coherence Score (NMPI)",
+    _, fig = scatter_plot(x_values, ys, x_label=x_label, y_label="Coherence Score (NMPI)",
                           color_legends=models, score_type='c_npmi')
     fig.savefig("visuals/" + filename_prefix + "_extrinsic_c_npmi_vs_k.pdf", bbox_inches='tight', transparent=True)
+
+    # execution times
+    ys = execution_time
+    _, fig = scatter_plot_2(x_values, ys, x_label=x_label, y_label="Seconds", score_type='secs')
+    fig.savefig("visuals/" + filename_prefix + "_execution_time.pdf", bbox_inches='tight', transparent=True)
+
+    # number of nodes
+    ys = number_of_nodes
+    _, fig = scatter_plot_2(x_values, ys, x_label=x_label, y_label="Number of Nodes", score_type='nodes')
+    fig.savefig("visuals/" + filename_prefix + "_number_of_nodes.pdf", bbox_inches='tight', transparent=True)
 
     # save all topics with their scores
     for m in models:
 
-        if model_dbs_scores is None:
-            vis_topics_score(model_topics[m], model_c_v_scores[m], model_npmi_scores[m], model_c_v_test_scores[m],
-                             model_npmi_test_scores[m], "visuals/clusters_eval_" + m.replace(" ", "-") + ".txt",
-                             dbs_scores=None)
+        if model_dbs_scores is not None:
+            dbs_scores = model_dbs_scores[m]
         else:
-            vis_topics_score(model_topics[m], model_c_v_scores[m], model_npmi_scores[m], model_c_v_test_scores[m],
-                             model_npmi_test_scores[m], "visuals/clusters_eval_" + m.replace(" ", "-") + ".txt",
-                             dbs_scores=model_dbs_scores[m])
+            dbs_scores = None
+
+        vis_topics_score(model_topics[m], model_c_v_scores[m], model_npmi_scores[m], model_c_v_test_scores[m],
+                         model_npmi_test_scores[m], model_u_mass_scores[m], model_u_mass_test_scores[m], execution_time,
+                         number_of_nodes, "visuals/clusters_eval_" + m.replace(" ", "-") + ".txt",
+                         dbs_scores=dbs_scores)
 
     plt.close('all')

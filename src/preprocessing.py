@@ -108,11 +108,14 @@ def preprocessing(segments: list, segment_labels: list, do_stemming: bool = Fals
         counter = Counter(temp_new_docs)
 
         docs_threshold = []
+        labels_threshold = []
         vocab_threshold = []
         for i_d, d in enumerate(new_docs):
 
             d_threshold = [w for w in d if counter[w] > count_threshold]
             if len(d_threshold) > 0:
+
+                labels_threshold.append(new_labels[i_d])
                 docs_threshold.append(d_threshold)
                 vocab_threshold.extend(d_threshold)
 
@@ -120,6 +123,7 @@ def preprocessing(segments: list, segment_labels: list, do_stemming: bool = Fals
         print("vocab withouth threshold len: " + str(len(vocabulary)))
         new_docs = docs_threshold
         vocabulary = vocab_threshold
+        new_labels = labels_threshold
 
     assert len(new_docs) == len(new_labels)
     return new_docs, new_labels, sorted(list(set(vocabulary))), tokenized_docs

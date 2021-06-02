@@ -84,8 +84,7 @@ if __name__ == "__main__":
 
     # parse parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pds', dest='data_set', type=str, required=True,
-                        help="state the preprocessed data set should be used: Just Nouns (JN), Fully Preprocessed (FP)")
+    parser.add_argument('--pds', dest='data_set', type=str, required=True,  help="state the preprocessed data set should be used: Just Nouns (JN), Fully Preprocessed (FP)")
 
     parser.add_argument('--tm', dest='topic_model', type=str, required=True,
                         help="state what topic model that should be used")
@@ -96,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument('--bert', dest='bert_type', type=str, required=False, default="normal_ll",
                         help="define the BERT embedding type")
 
-    parser.add_argument('--do_testing', dest='do_testing', required=False, default=False, action='store_true',
+    parser.add_argument('--do_testing', dest='do_testing', required=False, default=True, action='store_true',
                         help="should test data set be used")
     args = parser.parse_args()
 
@@ -108,6 +107,7 @@ if __name__ == "__main__":
     if args.topic_model == "null":
         assert args.misc_prints in ['segment_size', 'common_words'], ("select one of the misc_prints:  "
                                                                       "['segment_size', 'common_words']")
+    print("do_test: " + str(args.do_testing))
     # check if testing you be performed
     if args.do_testing:
         data, data_labels, test_data, test_data_labels = get_data()
@@ -138,4 +138,5 @@ if __name__ == "__main__":
             new_data_label.append(data_labels[i])
 
     main_fct(preprocessed_data_set=args.data_set, topic_model_type=args.topic_model, misc_prints=args.misc_prints,
-             bert_embedding_type=args.bert_type, raw_data=data, raw_labels=data_labels)
+             bert_embedding_type=args.bert_type, raw_data=new_data, raw_labels=new_data_label,
+             raw_test_data=new_test_data, raw_test_labels=new_test_data_label)

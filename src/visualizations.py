@@ -109,15 +109,18 @@ def label_distribution(doc_labels_true: list, doc_topics_pred: list, model_name:
 
 
 def vis_topics_score(topics_list: list, c_v_scores: list, npmi_scores: list, test_c_v_scores: list,
-                     test_nmpi_scores: list, filename: str, dbs_scores: list = None, n_words: int = 10):
+                     test_nmpi_scores: list, u_mass_scores: list, test_u_mass_scores: list, execution_times: list,
+                     number_of_nodes: list, filename: str, dbs_scores: list = None, n_words: int = 10):
     """
-    vis_topics_score is used to a file that lists the resulting topics from a topic model and its performance scors
+    vis_topics_score is used to a file that lists the resulting topics from a topic model and its performance scores
 
     :param topics_list: list of topics
     :param c_v_scores:  list of c_v coherence scores (instrinic)
     :param npmi_scores: list of NPMI scores (intrinsic)
     :param test_c_v_scores: list of c_v coherence scores (extrinsic)
     :param test_nmpi_scores: list of NPMI scores (extrinsic)
+    :param u_mass_scores: list of u_mass scores
+    :param test_u_mass_scores: list of u_mass scores (extrinsic)
     :param filename: name of the file
     :param dbs_scores: dbs score (intrinsic)
     :param n_words: number of topic representatives lists for each topic
@@ -148,13 +151,20 @@ def vis_topics_score(topics_list: list, c_v_scores: list, npmi_scores: list, tes
             myFile.write("intrinsic evaluation" + '\n')
             myFile.write("c_v score: " + str(c_v_scores[i]) + '\n')
             myFile.write("nmpi score: " + str(npmi_scores[i]) + '\n')
+            myFile.write("u_mass score: " + str(u_mass_scores[i]) + '\n')
 
             myFile.write("extrinsic evaluation" + '\n')
             myFile.write("c_v score: " + str(test_c_v_scores[i]) + '\n')
             myFile.write("nmpi score: " + str(test_nmpi_scores[i]) + '\n')
+            myFile.write("u_mass score: " + str(test_u_mass_scores[i]) + '\n')
 
             if dbs_scores is not None:
                 myFile.write("dbs score: " + ": " + str(dbs_scores[i]) + '\n')
+
+            myFile.write('\n')
+
+            myFile.write('execution time: ' + "{:.6f}".format(execution_times[i]) + '\n')
+            myFile.write('number of nodes: ' + str(number_of_nodes[i]) + '\n')
 
             myFile.write('\n\n\n')
 
@@ -203,7 +213,7 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     """
     fig, ax = vis_prep()
 
-    assert score_type in ["c_v", "u_mass", "c_npmi", "dbs", "ari", "ami", "acc"], "set the score_type of scatter plot"
+    assert score_type in ["c_v", "u_mass", "c_npmi", "c_u_mass", "dbs", "ari", "ami", "acc", "secs", "nodes"], "wrong score_type of scatter plot, using: " + str(score_type)
     assert isinstance(ys[0], list), "ys needs to be a list of list(s)"
     assert len(ys) == len(color_legends), "need a color legend for each y list (ys)"
 
@@ -224,11 +234,22 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     elif score_type == "c_v":
         y_ticks = [x / 10 for x in range(0, 11, 1)]
 
+    elif score_type == "c_u_mass":
+        y_ticks = [x for x in range(-25, 5, 5)]
+
     elif score_type == "dbs":
         all_y = []
         for y in ys:
             all_y.extend(y)
         y_ticks = [x/10 for x in range(00, 40, 5)]
+
+    elif score_type == "secs":
+        y_ticks = [x/10 for x in range(0, 10, 2)]
+
+    elif score_type == "nodes":
+        y_ticks = [x for x in range(0, 300, 50)]
+
+
     else:
         assert score_type in ["ari", "ami", "acc"]
         y_ticks = [x / 10 for x in range(0, 7, 1)]
@@ -242,6 +263,67 @@ def scatter_plot(x: list, ys: list, x_label: str, y_label: str, color_legends: l
     ax.tick_params(axis='both', labelsize='small')
 
     plt.legend(fontsize='x-small')
+    plt.setp(ax.spines.values(), linewidth=2)
+    plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
+    return plt, fig
+
+
+def scatter_plot_2(x: list, ys: list, x_label: str, y_label: str, score_type: str) -> plt:
+    """
+    scatter_plot plots the x and y values in a figure.
+
+    :param x: list of x values
+    :param ys: list of y value lists
+    :param x_label: x axis label
+    :param y_label: y axis label
+    :param color_legends: list of colors for each y list
+    :param score_type: score being plotted (u_mass, c_npmi, c_v, dbs, ari, ami, acc)
+
+    :return: pyplot
+    """
+    fig, ax = vis_prep()
+
+    assert score_type in ["c_v", "u_mass", "c_npmi", "c_u_mass", "dbs", "ari", "ami", "acc", "secs", "nodes"], "wrong score_type of scatter plot, using: " + str(score_type)
+
+    # mapper = mpl.cm.get_cmap('Pastel2')
+    plt.plot(x, ys, 'o-', color='black', markersize=17, linewidth=3,)
+
+    if score_type == "u_mass":
+        y_ticks = [x for x in range(-6, 8, 2)]
+
+    elif score_type == "c_npmi":
+        y_ticks = [x/10 for x in range(-1, 6, 1)]
+
+    elif score_type == "c_v":
+        y_ticks = [x / 10 for x in range(0, 11, 1)]
+
+    elif score_type == "c_u_mass":
+        y_ticks = [x for x in range(-25, 5, 5)]
+
+    elif score_type == "dbs":
+        all_y = []
+        for y in ys:
+            all_y.extend(y)
+        y_ticks = [x/10 for x in range(00, 40, 5)]
+
+    elif score_type == "secs":
+        y_ticks = [x/10 for x in range(0, 12, 2)]
+
+    elif score_type == "nodes":
+        y_ticks = [x for x in range(0, 300, 50)]
+
+
+    else:
+        assert score_type in ["ari", "ami", "acc"]
+        y_ticks = [x / 10 for x in range(0, 7, 1)]
+
+    ax.set_xlabel(x_label, fontsize='medium', labelpad=4)
+    ax.set_ylabel(y_label, fontsize='medium', labelpad=4)
+
+    ax.yaxis.set_ticks(y_ticks)
+    ax.xaxis.set_ticks(x)
+
+    ax.tick_params(axis='both', labelsize='small')
     plt.setp(ax.spines.values(), linewidth=2)
     plt.grid(color='grey', axis='y', linestyle='--', linewidth=0.7)
     return plt, fig

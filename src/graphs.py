@@ -1,5 +1,6 @@
 import networkx as nx
 from src.misc import *
+import time
 
 plt.rcParams['figure.figsize'] = [16, 9]
 
@@ -39,7 +40,8 @@ def remove_edges(graph: nx.Graph, edge_weights: list, percentile_cutoff: int, re
 
 
 def create_networkx_graph(words: list, word_embeddings: list, similarity_threshold: float = 0.4,
-                          percentile_cutoff: int = 70, remove_isolated_nodes: bool = True) -> nx.Graph:
+                          percentile_cutoff: int = 70, remove_isolated_nodes: bool = True,
+                          method: str = "using_cutoff", top_n: int = 10) -> nx.Graph:
     """
     create_networkx_graph creates a graph given the words and their embeddings
 
@@ -52,30 +54,82 @@ def create_networkx_graph(words: list, word_embeddings: list, similarity_thresho
     :return: word embedding graph
     """
     assert len(words) == len(word_embeddings), "words and word_embeddings must have the same length"
+
+    start_time = time.process_time()
+
     graph = nx.Graph()  # undirected graph
     # n = 0
     edge_weights = []
 
-    first_half = word_embeddings[:int(len(word_embeddings)/2)]
-    first_half_length = int(len(word_embeddings)/2)
-    second_half = word_embeddings[int(len(word_embeddings)/2):]
+    if method == "using_cutoff":
 
-    sim_matrix = cosine_similarity(first_half, second_half)
-    for i in range(len(first_half)):
-        word_i = words[i]
+        first_half_length = int(len(word_embeddings) / 2)
+        first_half = word_embeddings[:first_half_length]
+        second_half = word_embeddings[first_half_length:]
+        sim_matrix = cosine_similarity(first_half, second_half)
 
-        for j in range(len(second_half)):
-            word_j = words[first_half_length + j]
+        for i in range(len(first_half)):
+            word_i = words[i]
 
-            sim = sim_matrix[i][j]
+            sim_i = sim_matrix[i]
 
-            if sim < similarity_threshold:
+            sim_i_sorted_index = sorted(range(len(sim_i)), key=sim_i.__getitem__, reverse=True)
+
+            #for j in range(len(second_half)):
+                #word_j = words[first_half_length + j]
+                # sim = sim_matrix[i][j]
+
+            for j in sim_i_sorted_index:
+                word_j = words[first_half_length + j]
+                sim = sim_i[j]
+
+                if sim < similarity_threshold:
+                    # similarity is not high enough
+                    break
+                graph.add_edge(word_i, word_j, weight=float(sim))
+                edge_weights.append(sim)
+
+    elif method == "using_top_n":
+
+        # sim_matrix = cosine_similarity(word_embeddings, word_embeddings)
+        first_half = word_embeddings[:int(len(word_embeddings) / 2)]
+        first_half_length = int(len(word_embeddings) / 2)
+        second_half = word_embeddings[int(len(word_embeddings) / 2):]
+        sim_matrix = cosine_similarity(first_half, second_half)
+
+        for i in range(len(first_half)):  # range(len(word_embeddings)):
+
+            sim_vector = sim_matrix[i]
+            max_indices = sorted(range(len(sim_vector)), key=sim_vector.__getitem__, reverse=True)
+
+            for j in max_indices[:top_n]:
+                # if i == j:
+                #    continue
+
+                sim = sim_vector[j]  # sim_matrix[i][j]
+
+                # not needed when splitting the embedding matrix in two halves
+                # if sim < similarity_threshold:
                 # similarity is not high enough
-                continue
-            graph.add_edge(word_i, word_j, weight=float(sim))
-            edge_weights.append(sim)
+                #    break
 
-    return remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes)
+                word_i = words[i]
+                word_j = words[first_half_length + j]
+
+                # if graph.has_edge(word_j, word_i):
+                #    continue
+
+                # else:
+
+                graph.add_edge(word_i, word_j, weight=float(sim))
+                edge_weights.append(sim)
+        graph_creation_time = time.process_time() - start_time
+        return remove_edges(graph, edge_weights, 50, remove_isolated_nodes), graph_creation_time
+
+    graph_creation_time = time.process_time() - start_time
+
+    assert len(edge_weights) != 0, "edge_weights has no edges inside of it, cutoff = " + str(similarity_threshold)
+    return remove_edges(graph, edge_weights, percentile_cutoff, remove_isolated_nodes), graph_creation_time
 
 
 def sort_words_by(graph, word: str, word_weights: dict) -> Tuple[int, float, float]:

@@ -5,6 +5,7 @@ from src.misc import save_model_scores
 import pickle
 from networkx.algorithms import approximation as apxa
 from pathlib import Path
+import time
 
 w2v_params = {"min_c": 10, "win": 7, "negative": 0, "sample": 1e-5, "hs": 1, "epochs": 400, "sg": 1, 'seed': 42,
               'ns_exponent': 0.75}
@@ -46,6 +47,9 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
     test_y_npmi_model = {"K-Means": [], "Agglomerative": [], "HDBSCAN": []}
     y_topics = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
 
+    y_uMass_model = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
+    test_y_uMass_model = {'K-Means': [], 'Agglomerative': [], 'HDBSCAN': []}
+
     # get words and word embeddings
     # words, word_embeddings, _ = get_word_vectors(data_processed, vocab, params=w2v_params)
     w2v_model_file = "w2v_model-" + data_set_name + ".pickle"
@@ -65,8 +69,11 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
             pickle.dump(w2v_model, myFile)
 
     # perform HDBSCAN clustering
+    start_time_hdbscan = time.process_time()
     _, _, hdbscan_clusters_words, hdbscan_clusters_words_embeddings = hdbscan_clustering(words, word_embeddings,
                                                                                          min_cluster_size=6)
+    execution_time_hdbscan = time.process_time() - start_time_hdbscan
+
     # iterate over x-values (number of topics list)
     for k in x:
 
@@ -77,6 +84,7 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
                 clusters_words = hdbscan_clusters_words
                 clusters_words_embeddings = hdbscan_clusters_words_embeddings
 
+                execution_time = execution_time_hdbscan
             else:
                 assert cluster_type in ["K-Means", "Agglomerative"]
                 if cluster_type == "K-Means":
@@ -90,11 +98,20 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
                 else:
                     ranking_weight = ranking_weight_type
 
+                print("------------------------")
+                print("clustering type: " + str(cluster_type))
+                print("k: " + str(k))
+                start_time = time.process_time()
+
                 clusters_words, clusters_words_embeddings = get_word_clusters(
                     data_processed, words, word_embeddings, vocab, clustering_type=cluster_type,
                     params=clustering_params, clustering_weight_type=clustering_weight_type,
                     ranking_weight_type=ranking_weight,
                 )
+
+                execution_time = time.process_time() - start_time
+                print("execution time: " + "{:.6f}".format(execution_time))
+                print("------------------------")
 
             # perform Topic Vector Similarity
             if topic_vector_flag:
@@ -117,15 +134,19 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
             y_c_v_model[cluster_type].append(c_v_coherence_score(tokenized_docs, clusters_words))
             y_npmi_model[cluster_type].append(npmi_coherence_score(tokenized_docs, clusters_words, len(clusters_words)))
             y_dbs_model[cluster_type].append(davies_bouldin_index(clusters_words_embeddings))
+            y_uMass_model[cluster_type].append(c_v_coherence_score(tokenized_docs, clusters_words, cs_type='u_mass'))
 
             # extrinsic scores
             if test_tokenized_segments is not None:
                 test_y_c_v_model[cluster_type].append(c_v_coherence_score(test_tokenized_segments, clusters_words))
                 test_y_npmi_model[cluster_type].append(npmi_coherence_score(test_tokenized_segments, clusters_words,
                                                                             len(clusters_words)))
+                test_y_uMass_model[cluster_type].append(
+                    c_v_coherence_score(test_tokenized_segments, clusters_words, cs_type='u_mass'))
             else:
                 test_y_c_v_model[cluster_type].append(-1000.0)
                 test_y_npmi_model[cluster_type].append(-1000.0)
+                test_y_uMass_model[cluster_type].append(-1000.0)
 
     # save model scores
     if topic_vector_flag:
@@ -134,10 +155,15 @@ def word2vec_topic_model(data_processed: list, vocab: list, tokenized_docs: list
         filename_prefix = "RRW"
 
     # save model scores
+
     save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
-                      model_npmi_test_scores=test_y_npmi_model, filename_prefix=filename_prefix,
-                      model_dbs_scores=y_dbs_model)
+                      model_npmi_test_scores=test_y_npmi_model,
+                      model_u_mass_scores=y_uMass_model, model_u_mass_test_scores=test_y_uMass_model,
+                      execution_time=[-1 for _ in range(len(y_topics[0]))],
+                      number_of_nodes=[-1 for _ in range(len(y_topics[0]))],
+                      filename_prefix='k-components',
+                      model_dbs_scores=y_dbs_model, x_label="Percentile Cutoff")
 
 
 def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, test_tokenized_segments: list,
@@ -157,8 +183,8 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
     word_weights = get_word_weights(data_processed, vocab, n_words, weight_type='tf')
 
     # get Word2Vec embeddings
-    w2v_model_file = "w2v_model-k_components-" + data_set_name + ".pickle"
-    if Path("data/" + w2v_model_file).is_file():
+    w2v_model_file = "w2v_model-k_components-" + data_set_name + "-temp.pickle"
+    if False:  # Path("data/" + w2v_model_file).is_file():
 
         print("using pre-calculated w2v model")
         with open("data/" + w2v_model_file, "rb") as myFile:
@@ -185,15 +211,28 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
     test_y_c_v_model = {"K=1": [], "K=2": [], "K=3": []}
     test_y_npmi_model = {"K=1": [], "K=2": [], "K=3": []}
 
+    y_uMass_model = {"K=1": [], "K=2": [], "K=3": []}
+    test_y_uMass_model = {"K=1": [], "K=2": [], "K=3": []}
+
     # iterate over all x values (percentile cutoff values)
     x = [x for x in range(50, 100, 10)] + [95]
+    # x = [80]
+    # x = [x for x in range(1, 11, 1)]
+    execution_times = []
+    number_of_nodes = []
+
+    topic_vector_flag = False
     for sim in x:
 
-        # create word embedding graph using cutff threshold
-        graph = create_networkx_graph(vocab_words, vocab_embeddings, similarity_threshold=0.8, percentile_cutoff=sim)
+        # create word embedding graph using cutoff threshold
+        graph, graph_creation_time = create_networkx_graph(vocab_words, vocab_embeddings,
+                                                           similarity_threshold=0.8, percentile_cutoff=sim)
 
+        number_of_nodes.append(graph.number_of_nodes())
         # calculate the k-components
+        start_time = time.process_time()
         components_all = apxa.k_components(graph)
+        k_components_time = time.process_time() - start_time
 
         # iterate over all k-components
         for k_component in y_topics.keys():
@@ -204,13 +243,31 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
 
             # remove too small topics
             corpus_clusters = []
+            clusters_words_embeddings = []
             for comp in components:
                 if len(comp) >= 6:
-                    corpus_clusters.append(comp)
+                    corpus_clusters.append(list(comp))
+                    clusters_words_embeddings.append([w2v_model.wv.get_vector(w) for w in comp])
 
-            # sort topic representatives by node degree
-            cluster_words = [sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_weights)),
-                                    reverse=True) for c in corpus_clusters]
+            if topic_vector_flag:
+                # perform Topic Vector Similarity
+                topic_vectors = [get_topic_vector(c) for c in clusters_words_embeddings]
+
+                # get topics based on topic vectors
+                topic_vector_cluster_words = []
+                topic_vector_cluster_words_embeddings = []
+                for i, t_vector in enumerate(topic_vectors):
+                    sim_indices = get_nearest_indices(t_vector, clusters_words_embeddings[i])
+
+                    topic_vector_cluster_words.append([corpus_clusters[i][i_w] for i_w in sim_indices])
+                    topic_vector_cluster_words_embeddings.append([clusters_words_embeddings[i][i_w]
+                                                                  for i_w in sim_indices])
+                cluster_words = topic_vector_cluster_words
+
+            else:
+                # sort topic representatives by node degree
+                cluster_words = [sorted(list(c), key=(lambda w: sort_words_by(graph, w, word_weights)), reverse=True)
+                                 for c in corpus_clusters]
 
             if len(cluster_words) <= 2:
                 # topic model did not find enough topics
@@ -220,6 +277,8 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
                 cs_npmi = -1000.0
                 cs_c_v_test = -1000.0
                 cs_npmi_test = -1000.0
+                cs_u_mass = -1000.0
+                cs_u_mass_test = -1000.0
             else:
                 cluster_embeddings = [[w2v_model.wv.vectors[w2v_model.wv.index2word.index(w)] for w in words]
                                       for words in cluster_words]
@@ -229,14 +288,17 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
                 cs_c_v = c_v_coherence_score(tokenized_docs, cluster_words)
                 dbs = davies_bouldin_index(cluster_embeddings)
                 cs_npmi = npmi_coherence_score(data_processed, cluster_words, len(cluster_words))
+                cs_u_mass = c_v_coherence_score(tokenized_docs, cluster_words, cs_type='u_mass')
 
                 # extrinsic scores
                 if test_tokenized_segments is not None:
                     cs_c_v_test = c_v_coherence_score(test_tokenized_segments, cluster_words)
                     cs_npmi_test = npmi_coherence_score(test_tokenized_segments, cluster_words, len(cluster_words))
+                    cs_u_mass_test = c_v_coherence_score(test_tokenized_segments, cluster_words, cs_type='u_mass')
                 else:
                     cs_c_v_test = -1000.0
                     cs_npmi_test = -1000.0
+                    cs_u_mass_test = -1000.0
 
             y_topics[k_component].append(cluster_words)
             y_c_v_model[k_component].append(cs_c_v)
@@ -245,11 +307,19 @@ def k_components_model(data_processed: list, vocab: list, tokenized_docs: list, 
             test_y_c_v_model[k_component].append(cs_c_v_test)
             test_y_npmi_model[k_component].append(cs_npmi_test)
 
-    # save topic model scores
+            y_uMass_model[k_component].append(cs_u_mass)
+            test_y_uMass_model[k_component].append(cs_u_mass_test)
+
+        # save topic model scores
+        execution_times.append(k_components_time + graph_creation_time)
+
     save_model_scores(x_values=x, models=list(y_topics.keys()), model_topics=y_topics, model_c_v_scores=y_c_v_model,
                       model_npmi_scores=y_npmi_model, model_c_v_test_scores=test_y_c_v_model,
-                      model_npmi_test_scores=test_y_npmi_model, filename_prefix='k-components', 
-                      model_dbs_scores=y_dbs_model)
+                      model_npmi_test_scores=test_y_npmi_model,
+                      model_u_mass_scores=y_uMass_model, model_u_mass_test_scores=test_y_uMass_model,
+                      execution_time=execution_times, number_of_nodes=number_of_nodes,
+                      filename_prefix='k-components',
+                      model_dbs_scores=y_dbs_model, x_label="Percentile Cutoff")
 
 
 def bert_topic_model(bert_embedding_type: str, all_data_processed: list, vocab: list, test_tokenized_segments: list,
